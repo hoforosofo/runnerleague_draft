@@ -59,3 +59,20 @@ main{height:calc(100dvh - 92px);padding:0 20px 18px;gap:16px;grid-template-colum
  .result-portrait{position:relative;min-height:0;overflow:hidden}
  .result-portrait .avatar{position:absolute;inset:0;width:100%;height:100%;max-height:100%;object-fit:contain}
 }
+
+/* Final results: one horizontal row per team, in actual pick order. */
+#results[hidden]{display:none}
+#results{height:100dvh;box-sizing:border-box}
+.results-grid{display:flex;flex-direction:column;gap:12px;flex:none}
+.result-team{display:grid;grid-template-columns:140px minmax(0,1fr);gap:16px;min-height:0;overflow:visible}
+.result-team-title{border-bottom:0;border-right:1px solid #edf1f7;padding:0 12px 0 0}
+.result-team-title h2{font-size:18px}
+.result-captain{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:10px;color:#8392a7}
+.result-captain .avatar{width:80px;height:64px}
+.result-roster{display:flex;flex-direction:row;gap:12px;overflow-x:auto;min-width:0}
+.result-pick{display:flex;flex:1 0 100px;flex-direction:column;align-items:center;gap:5px;min-width:100px}
+.result-pick-label{font-size:11px;color:#53729d;white-space:nowrap}
+.result-pick .result-portrait{position:static;width:100%;height:80px;flex:none;overflow:visible}
+.result-pick .result-portrait .avatar{position:static;width:100%;height:80px;max-height:none;object-fit:contain}
+.result-pick strong{font-size:12px}
+@media(max-width:700px){.result-team{grid-template-columns:100px minmax(0,1fr);gap:10px;padding:12px}.result-team-title h2{font-size:15px}.result-roster{gap:8px}.result-pick{flex-basis:90px;min-width:90px}}

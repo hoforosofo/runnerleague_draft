@@ -9,13 +9,19 @@ const chosen=()=>picks.filter(Boolean);
 const nextIndex=()=>{for(let i=0;i<total();i++)if(!picks[i])return i;return -1};
 const current=()=>nextIndex()<0?null:turnOwners[nextIndex()];
 function schedule(){
- const capacity=total()/5,remaining=Object.fromEntries(order.map(t=>[t,capacity-chosen().filter(p=>p.team===t).length]));
- const queue=[];
- for(let round=0;queue.length<total()-chosen().length;round++){
-  const row=round%2?[...order].reverse():order;
-  for(const team of row)if(remaining[team]>0){queue.push(team);remaining[team]--}
+ // Preserve completed picks; reorder only the unfilled turns in each round.
+ // Each team owns exactly one pick per round, including canceled pick slots.
+ turnOwners=Array(total());
+ for(let round=0;round<total()/order.length;round++){
+  const start=round*order.length;
+  const row=round%2?[...order].reverse():[...order];
+  const completed=new Set(picks.slice(start,start+order.length).filter(Boolean).map(p=>p.team));
+  const remaining=row.filter(team=>!completed.has(team));
+  for(let col=0;col<order.length;col++){
+   const index=start+col;
+   turnOwners[index]=picks[index]?.team||remaining.shift();
+  }
  }
- turnOwners=Array.from({length:total()},(_,i)=>picks[i]?.team||queue.shift());
 }
 function removePlayer(id){
  const index=picks.findIndex(p=>p?.player===id);
@@ -66,10 +72,14 @@ function renderResults(){
  }
  screen.hidden=!(complete&&resultsConfirmed);document.body.classList.toggle('show-results',complete&&resultsConfirmed);
  if(!complete||!resultsConfirmed)return;
- screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>선발이 완료되었습니다. 카드를 누르면 해당 선발을 취소할 수 있습니다.</p></div><button class="primary" id="restart-draft">드래프트 다시하기</button></div><div class="results-grid">${order.map((team,i)=>{
- const roster=chosen().filter(p=>p.team===team).map(p=>byId(p.player));
- if(!coachMode&&coaches[team])roster.push(byId(coaches[team]));
- return `<article class="result-team"><div class="result-team-title"><small>TEAM ${String(i+1).padStart(2,'0')}</small><h2>${team} 팀</h2></div><div class="result-roster">${['tank','damage','support','coach'].map(role=>{const list=role==='tank'?[byId(team)]:roster.filter(p=>p.role===role);return `<div class="result-role"><span>${roles[role]}</span><div>${list.map(p=>role==='tank'?`<div class="result-portrait">${avatar(p)}</div>`:`<button class="result-portrait" data-remove-player="${p.id}" aria-label="${p.name} 선발 취소" title="${p.name} · 클릭하여 선발 취소">${avatar(p)}</button>`).join('')}</div></div>`}).join('')}</div></article>`
+ screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>선발이 완료되었습니다. 팀별 실제 선발 순서입니다. 카드를 누르면 해당 선발을 취소할 수 있습니다.</p></div><button class="primary" id="restart-draft">드래프트 다시하기</button></div><div class="results-grid">${order.map((team,i)=>{
+ const draft=picks.map((entry,index)=>entry?.team===team?{...entry,index}:null).filter(Boolean);
+ const cells=draft.map(entry=>{
+  const p=byId(entry.player);
+  return `<div class="result-pick"><span class="result-pick-label">${entry.index+1}번째 픽 · ${displayRole(p)}</span><button class="result-portrait" data-remove-player="${p.id}" aria-label="${p.name} 선발 취소" title="${p.name} · 클릭하여 선발 취소">${avatar(p)}</button><strong>${p.name}</strong></div>`;
+ }).join('');
+ const coach=!coachMode&&coaches[team]?byId(coaches[team]):null;
+ return `<article class="result-team"><div class="result-team-title"><small>드래프트 순서 ${i+1}</small><h2>${team} 팀</h2><div class="result-captain">${avatar(byId(team))}<span>팀장</span></div></div><div class="result-roster">${cells}${coach?`<div class="result-pick"><span class="result-pick-label">코치 별도 배정</span><button class="result-portrait" data-remove-player="${coach.id}" aria-label="${coach.name} 배정 취소">${avatar(coach)}</button><strong>${coach.name}</strong></div>`:''}</div></article>`
  }).join('')}</div>`;
  $('#restart-draft').onclick=()=>{reset(true);window.scrollTo(0,0)};
 }
