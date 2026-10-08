@@ -74,7 +74,7 @@ function renderResults(){
  screen.hidden=!(complete&&resultsConfirmed);document.body.classList.toggle('show-results',complete&&resultsConfirmed);
  if(!complete||!resultsConfirmed)return;
  screen.classList.toggle('vertical-view',resultView==='vertical');
- screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>선발이 완료되었습니다. 돌격 카드를 드래그하거나 클릭해 다른 팀의 탱커와 교환할 수 있습니다.</p></div><div class="results-actions"><div class="view-switch" aria-label="팀 구성 보기"><button class="secondary" data-view="horizontal" aria-pressed="${resultView==='horizontal'}">가로 보기</button><button class="secondary" data-view="vertical" aria-pressed="${resultView==='vertical'}">세로 보기</button></div><button class="secondary" id="edit-draft">수정하기</button><button class="primary" id="restart-draft">드래프트 다시하기</button></div></div><div class="results-grid">${order.map((team,i)=>{
+ screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>선발이 완료되었습니다. 돌격 카드를 드래그하거나 클릭해 다른 팀의 탱커와 교환할 수 있습니다.</p></div><div class="results-actions"><div class="view-switch" aria-label="팀 구성 보기"><button class="secondary" data-view="horizontal" aria-pressed="${resultView==='horizontal'}">가로 보기</button><button class="secondary" data-view="vertical" aria-pressed="${resultView==='vertical'}">세로 보기</button></div><button class="primary" id="save-results">결과 이미지 저장</button><button class="secondary" id="edit-draft">수정하기</button><button class="primary" id="restart-draft">드래프트 다시하기</button></div></div><div class="results-grid">${order.map((team,i)=>{
  const roster=chosen().filter(p=>p.team===team).map(p=>byId(p.player));
  if(!coachMode&&coaches[team])roster.push(byId(coaches[team]));
  return `<article class="result-team" style="--team-color:${colors[i]}" aria-label="${tanks[team]} 팀"><div class="result-team-title"><small>TEAM ${String(i+1).padStart(2,'0')}</small><h2>${tanks[team]} 팀</h2></div><div class="result-roster">${['tank','damage','support','coach'].map(role=>{const list=role==='tank'?[byId(tanks[team])]:sortRoster(roster.filter(p=>p.role===role));return `<div class="result-role"><span>${roles[role]}</span><div>${list.map(p=>role==='tank'?`<div class="result-member"><button class="result-portrait result-tank" draggable="true" data-edit-tank="${team}" aria-label="${p.name} 탱커 교체" title="탱커 교체">${avatar(p)}</button><span class="result-member-meta"><strong>${p.name}</strong><small>${roles[p.role]}</small></span></div>`:`<div class="result-member"><div class="result-portrait">${avatar(p)}</div><span class="result-member-meta"><strong>${p.name}</strong><small>${roles[p.role]}</small></span></div>`).join('')}</div></div>`}).join('')}</div></article>`
@@ -86,8 +86,35 @@ function renderResults(){
  b.ondragover=e=>{if(e.dataTransfer.types.includes('application/x-result-tank'))e.preventDefault()};
  b.ondrop=e=>{e.preventDefault();const source=e.dataTransfer.getData('application/x-result-tank'),target=b.dataset.editTank;if(source===target||!order.includes(source))return;[tanks[source],tanks[target]]=[tanks[target],tanks[source]];render()};
  });
+ $('#save-results').onclick=downloadResultsImage;
  $('#edit-draft').onclick=()=>{resultsConfirmed=false;completionPrompted=true;render();window.scrollTo(0,0)};
  $('#restart-draft').onclick=()=>{reset(true);window.scrollTo(0,0)};
+}
+async function downloadResultsImage(){
+ const button=$('#save-results');if(!resultsConfirmed||button.disabled)return;button.disabled=true;button.textContent='저장 중…';
+ try{
+  await document.fonts.ready;
+  const vertical=resultView==='vertical',canvas=document.createElement('canvas');canvas.width=vertical?1600:1600;canvas.height=vertical?1060:900;
+  const ctx=canvas.getContext('2d');ctx.fillStyle='#f3f6fb';ctx.fillRect(0,0,canvas.width,canvas.height);
+  const text=(value,x,y,size,color='#17243b',weight=650)=>{ctx.font=`${weight} ${size}px League, sans-serif`;ctx.fillStyle=color;ctx.textAlign='left';ctx.fillText(value,x,y)};
+  const box=(x,y,w,h,color,r=14)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=color;ctx.fill()};
+  text('RUNNER LEAGUE / DRAFT COMPLETE',32,34,14,'#2463eb',750);text('최종 팀 구성',32,76,32,'#17243b',800);
+  const loadImage=async p=>{if(!p.image)return null;const img=new Image();img.src=p.image;await img.decode();return img};
+  const images=new Map(await Promise.all(players.map(async p=>[p.id,await loadImage(p)])));
+  const portrait=(p,x,y,w,h)=>{const img=images.get(p.id);if(!img){text(p.name,x,y+h/2,14);return}const scale=Math.min(w/img.naturalWidth,h/img.naturalHeight),iw=img.naturalWidth*scale,ih=img.naturalHeight*scale;ctx.drawImage(img,x+(w-iw)/2,y+(h-ih)/2,iw,ih)};
+  for(const [i,team] of order.entries()){
+   const roster=chosen().filter(p=>p.team===team).map(p=>byId(p.player));if(!coachMode&&coaches[team])roster.push(byId(coaches[team]));
+   const members=[byId(tanks[team]),...sortRoster(roster.filter(p=>p.role==='damage')),...sortRoster(roster.filter(p=>p.role==='support')),...roster.filter(p=>p.role==='coach')];
+   if(vertical){
+    const x=32+i*310,y=110,w=296,h=918;box(x,y,w,h,'#fff');box(x,y,w,4,colors[i],2);text(`TEAM ${String(i+1).padStart(2,'0')}`,x+18,y+32,12,'#2463eb',750);text(`${tanks[team]} 팀`,x+18,y+62,22,'#17243b',750);
+    members.forEach((p,j)=>{const ry=y+86+j*133;portrait(p,x+18,ry+8,82,106);text(p.name,x+114,ry+51,16);text(roles[p.role],x+114,ry+75,12,'#7b889d',500);ctx.fillStyle='#e3eaf4';ctx.fillRect(x+18,ry+129,w-36,1)});
+   }else{
+    const x=32,y=110+i*151,w=1536,h=139;box(x,y,w,h,'#fff');box(x,y,4,h,colors[i],2);text(`TEAM ${String(i+1).padStart(2,'0')}`,x+18,y+48,12,'#2463eb',750);text(`${tanks[team]} 팀`,x+18,y+78,21,'#17243b',750);
+    members.forEach((p,j)=>{const px=x+180+j*218;ctx.font='600 11px League, sans-serif';ctx.fillStyle='#7b889d';ctx.textAlign='center';ctx.fillText(roles[p.role],px+88,y+17);ctx.textAlign='left';portrait(p,px,y+24,176,106)});
+   }
+  }
+  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('PNG 생성 실패');const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`runnerleague_results_${resultView}.png`;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+ }catch(error){toast('이미지 저장에 실패했습니다. 다시 시도해 주세요.');console.error(error)}finally{button.disabled=false;button.textContent='결과 이미지 저장'}
 }
 function openTankPicker(team){
  if(!resultsConfirmed)return;
