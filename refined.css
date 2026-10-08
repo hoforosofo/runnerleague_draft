@@ -95,3 +95,14 @@ main{height:calc(100dvh - 92px);padding:0 20px 18px;gap:16px;grid-template-colum
 
 .result-tank{cursor:pointer}.result-tank:hover{outline:2px solid #2463eb;outline-offset:1px;background:#eef4ff}
 .result-portrait:not(button){cursor:default}.tank-options{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:16px 0}.tank-option{border:1px solid #dfe7f3;border-radius:8px;background:#fff;padding:6px;color:#243957}.tank-option .avatar{width:100%;height:80px}.tank-option strong{display:block;font-size:11px;margin-top:5px}.tank-option:disabled{opacity:.45}#tank-dialog{max-width:620px}.captain[draggable=false]{cursor:default}
+
+/* Keep portraits together and use the nameplates inside the images. */
+#results{gap:10px;padding:12px 18px}
+.results-grid{width:100%;max-width:1500px;align-self:center;gap:6px}
+.result-team{grid-template-columns:125px minmax(0,1fr);gap:8px;padding:6px 10px}
+.result-team-title{padding-right:8px}
+.result-roster{width:100%;max-width:1120px;justify-self:center;gap:6px}
+.result-role{gap:2px}.result-role>div{gap:4px}
+.result-role:not(:last-child){padding-right:6px}
+.result-member{gap:0}.result-member>strong{display:none}
+@media(max-width:700px){#results{padding:12px}.result-team{padding:10px}.result-roster{gap:8px}.results-grid{gap:10px}}
