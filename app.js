@@ -74,7 +74,7 @@ function renderResults(){
  screen.hidden=!(complete&&resultsConfirmed);document.body.classList.toggle('show-results',complete&&resultsConfirmed);
  if(!complete||!resultsConfirmed)return;
  screen.classList.toggle('vertical-view',resultView==='vertical');
- screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>선발이 완료되었습니다. 돌격 카드를 드래그하거나 클릭해 다른 팀의 탱커와 교환할 수 있습니다.</p></div><div class="results-actions"><div class="view-switch" aria-label="팀 구성 보기"><button class="secondary" data-view="horizontal" aria-pressed="${resultView==='horizontal'}">가로 보기</button><button class="secondary" data-view="vertical" aria-pressed="${resultView==='vertical'}">세로 보기</button></div><button class="primary" id="save-results">결과 이미지 저장</button><button class="secondary" id="edit-draft">수정하기</button><button class="primary" id="restart-draft">드래프트 다시하기</button></div></div><div class="results-grid">${order.map((team,i)=>{
+ screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>선발이 완료되었습니다. 돌격 카드를 드래그하거나 클릭해 다른 팀의 탱커와 교환할 수 있습니다.</p></div><div class="results-actions"><button class="secondary" id="save-result-draft">임시저장</button><button class="secondary" id="load-result-draft">불러오기</button><div class="view-switch" aria-label="팀 구성 보기"><button class="secondary" data-view="horizontal" aria-pressed="${resultView==='horizontal'}">가로 보기</button><button class="secondary" data-view="vertical" aria-pressed="${resultView==='vertical'}">세로 보기</button></div><button class="primary" id="save-results">결과 이미지 저장</button><button class="secondary" id="edit-draft">수정하기</button><button class="primary" id="restart-draft">드래프트 다시하기</button></div></div><div class="results-grid">${order.map((team,i)=>{
  const roster=chosen().filter(p=>p.team===team).map(p=>byId(p.player));
  if(!coachMode&&coaches[team])roster.push(byId(coaches[team]));
  return `<article class="result-team" style="--team-color:${colors[i]}" aria-label="${tanks[team]} 팀"><div class="result-team-title"><small>TEAM ${String(i+1).padStart(2,'0')}</small><h2>${tanks[team]} 팀</h2></div><div class="result-roster">${['tank','damage','support','coach'].map(role=>{const list=role==='tank'?[byId(tanks[team])]:sortRoster(roster.filter(p=>p.role===role));return `<div class="result-role"><span>${roles[role]}</span><div>${list.map(p=>role==='tank'?`<div class="result-member"><button class="result-portrait result-tank" draggable="true" data-edit-tank="${team}" aria-label="${p.name} 탱커 교체" title="탱커 교체">${avatar(p)}</button><span class="result-member-meta"><strong>${p.name}</strong><small>${roles[p.role]}</small></span></div>`:`<div class="result-member"><div class="result-portrait">${avatar(p)}</div><span class="result-member-meta"><strong>${p.name}</strong><small>${roles[p.role]}</small></span></div>`).join('')}</div></div>`}).join('')}</div></article>`
@@ -86,6 +86,7 @@ function renderResults(){
  b.ondragover=e=>{if(e.dataTransfer.types.includes('application/x-result-tank'))e.preventDefault()};
  b.ondrop=e=>{e.preventDefault();const source=e.dataTransfer.getData('application/x-result-tank'),target=b.dataset.editTank;if(source===target||!order.includes(source))return;[tanks[source],tanks[target]]=[tanks[target],tanks[source]];render()};
  });
+ $('#save-result-draft').onclick=saveDraft;$('#load-result-draft').onclick=openSavedDrafts;
  $('#save-results').onclick=downloadResultsImage;
  $('#edit-draft').onclick=()=>{resultsConfirmed=false;completionPrompted=true;render();window.scrollTo(0,0)};
  $('#restart-draft').onclick=()=>{reset(true);window.scrollTo(0,0)};
@@ -124,7 +125,40 @@ function openTankPicker(team){
  dialog.querySelectorAll('[data-tank]').forEach(b=>b.onclick=()=>{const other=order.find(t=>tanks[t]===b.dataset.tank);if(!other||other===team)return;[tanks[team],tanks[other]]=[tanks[other],tanks[team]];dialog.close();render()});
  $('#close-tank').onclick=()=>dialog.close();dialog.showModal();
 }
+const SAVE_KEY='runnerleague.saved-drafts.v1';
+function readSavedDrafts(){const raw=localStorage.getItem(SAVE_KEY);if(!raw)return [];const data=JSON.parse(raw);if(!Array.isArray(data))throw Error('저장 목록 오류');return data}
+function snapshotDraft(){return {version:1,order:[...order],picks:picks.map(p=>p?{...p}:null),turnOwners:[...turnOwners],coachMode,coaches:{...coaches},tanks:{...tanks},filter,started,resultsConfirmed,resultView}}
+function validSnapshot(s){
+ if(!s||s.version!==1||typeof s.coachMode!=='boolean'||!Array.isArray(s.order)||s.order.length!==5||new Set(s.order).size!==5||!s.order.every(t=>initialOrder.includes(t)))return false;
+ const count=s.coachMode?25:20;
+ if(!Array.isArray(s.picks)||s.picks.length>count||!Array.isArray(s.turnOwners)||s.turnOwners.length!==count||!s.turnOwners.every(t=>s.order.includes(t)))return false;
+ if(!s.tanks||!s.coaches||!s.order.every(t=>byId(s.tanks[t])?.role==='tank')||new Set(Object.values(s.tanks)).size!==5)return false;
+ const selected=s.picks.filter(Boolean),coachIds=Object.values(s.coaches);
+ if(!selected.every((p)=>byId(p.player)&&byId(p.player).role!=='tank'&&s.order.includes(p.team))||!s.picks.every((p,i)=>!p||p.team===s.turnOwners[i]))return false;
+ if(!Object.entries(s.coaches).every(([t,id])=>s.order.includes(t)&&byId(id)?.role==='coach')||s.coachMode&&coachIds.length)return false;
+ const ids=[...selected.map(p=>p.player),...coachIds];if(new Set(ids).size!==ids.length)return false;
+ return s.order.every(t=>['damage','support','coach'].every(role=>selected.filter(p=>p.team===t&&byId(p.player).role===role).length<=(role==='coach'&&!s.coachMode?0:caps[role])));
+}
+function saveDraft(){
+ try{const saves=readSavedDrafts(),now=new Date(),entry={id:crypto.randomUUID(),name:`임시저장 ${now.toLocaleString('ko-KR')}`,savedAt:now.toISOString(),state:snapshotDraft()};saves.unshift(entry);localStorage.setItem(SAVE_KEY,JSON.stringify(saves));toast('현재 드래프트를 임시저장했습니다.');openSavedDrafts()}
+ catch(error){toast('임시저장에 실패했습니다. 브라우저 저장 공간을 확인해 주세요.');console.error(error)}
+}
+function loadDraft(id){
+ try{const saved=readSavedDrafts().find(entry=>entry.id===id);if(!saved||!validSnapshot(saved.state))throw Error('유효하지 않은 저장');const state=saved.state;
+ order=[...state.order];picks=state.picks.map(p=>p?{...p}:null);turnOwners=[...state.turnOwners];coachMode=state.coachMode;coaches={...state.coaches};tanks={...state.tanks};filter=['all','damage','support','coach'].includes(state.filter)?state.filter:'all';started=chosen().length>0||!!state.started;resultsConfirmed=!!state.resultsConfirmed;resultView=state.resultView==='vertical'?'vertical':'horizontal';completionPrompted=false;$('#saved-drafts').close();render();toast('임시저장한 드래프트를 불러왔습니다.');
+ }catch(error){toast('저장 내용을 불러올 수 없습니다.');console.error(error)}
+}
+function openSavedDrafts(){
+ let dialog=$('#saved-drafts');if(!dialog){dialog=document.createElement('dialog');dialog.id='saved-drafts';dialog.setAttribute('aria-labelledby','saved-title');document.body.append(dialog)}
+ dialog.replaceChildren();const heading=document.createElement('h2');heading.id='saved-title';heading.textContent='임시저장 목록';dialog.append(heading);const hint=document.createElement('p');hint.textContent='같은 브라우저에서 저장한 순서와 선발 내역을 불러올 수 있습니다.';dialog.append(hint);
+ try{const saves=readSavedDrafts();if(!saves.length){const empty=document.createElement('p');empty.textContent='저장된 드래프트가 없습니다.';dialog.append(empty)}
+ const list=document.createElement('div');list.className='saved-list';for(const entry of saves){const row=document.createElement('article');row.className='saved-row';const info=document.createElement('div');const name=document.createElement('strong');name.textContent=entry.name;const detail=document.createElement('small');detail.textContent=`${entry.state?.picks?.filter(Boolean).length||0}명 선발 · ${entry.state?.coachMode?'코치 포함':'코치 별도 배정'}`;info.append(name,detail);const actions=document.createElement('div');actions.className='saved-actions';const load=document.createElement('button');load.className='primary';load.textContent='불러오기';load.dataset.loadDraft=entry.id;load.onclick=()=>loadDraft(entry.id);const remove=document.createElement('button');remove.className='secondary';remove.textContent='삭제';remove.onclick=()=>{try{localStorage.setItem(SAVE_KEY,JSON.stringify(readSavedDrafts().filter(s=>s.id!==entry.id)));openSavedDrafts()}catch{toast('삭제하지 못했습니다.')}};actions.append(load,remove);row.append(info,actions);list.append(row)}dialog.append(list)
+ }catch{const error=document.createElement('p');error.textContent='저장 목록을 읽을 수 없습니다.';dialog.append(error)}
+ const close=document.createElement('button');close.className='secondary';close.textContent='닫기';close.onclick=()=>dialog.close();dialog.append(close);if(!dialog.open)dialog.showModal();
+}
+function initDraftStorage(){const controls=document.createElement('div');controls.className='draft-save-tools';const save=document.createElement('button');save.className='secondary';save.id='save-draft';save.textContent='임시저장';save.onclick=saveDraft;const load=document.createElement('button');load.className='secondary';load.id='load-drafts';load.textContent='불러오기';load.onclick=openSavedDrafts;controls.append(save,load);document.querySelector('.header-right').prepend(controls)}
 function confirmReset(edit){if(!picks.length&&!Object.keys(coaches).length){reset(edit);return;}pendingAction=()=>reset(edit);$('#confirm-title').textContent=edit?'순서를 다시 설정할까요?':'드래프트를 초기화할까요?';$('#accept-confirm').textContent=edit?'다시 설정':'초기화';$('#confirm').showModal()}
 function reset(edit){tanks=Object.fromEntries(initialOrder.map(team=>[team,team]));picks=[];coaches={};started=false;filter='all';schedule();render();toast(edit?'팀장 순서를 다시 정할 수 있습니다.':'선발 내역을 초기화했습니다.')}
 function openCoaches(team){selectedCoachTeam=team;$('#coach-description').textContent=`${team} 팀의 코치를 선택하세요.`;$('#coach-options').innerHTML=players.filter(p=>p.role==='coach').map(p=>{const assigned=Object.entries(coaches).find(([,id])=>id===p.id);return `<button class="secondary" data-coach="${p.id}" ${assigned?'disabled':''}>${avatar(p)}<span>${p.name}${assigned?` · ${assigned[0]} 팀`:''}</span></button>`}).join('');document.querySelectorAll('[data-coach]').forEach(b=>b.onclick=()=>{coaches[selectedCoachTeam]=b.dataset.coach;$('#coach-dialog').close();render()});$('#coach-dialog').showModal()}
 $('#start').onclick=()=>{if(started)return;started=true;schedule();render()};$('#coach-mode').onchange=e=>{coachMode=e.target.checked;coaches={};schedule();render()};$('#undo').onclick=()=>{const last=chosen().at(-1);if(last)removePlayer(last.player)};$('#reset').onclick=()=>confirmReset(false);$('#edit-order').onclick=()=>confirmReset(true);$('#cancel-confirm').onclick=()=>$('#confirm').close();$('#accept-confirm').onclick=()=>{pendingAction?.();$('#confirm').close();pendingAction=null};$('#close-coach').onclick=()=>$('#coach-dialog').close();document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>{filter=b.dataset.role;renderPool()});document.querySelectorAll('dialog').forEach(d=>d.onclick=e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close()}});schedule();render();
+initDraftStorage();
