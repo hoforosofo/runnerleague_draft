@@ -6,7 +6,7 @@ const rosterRank=new Map(players.map((p,i)=>[p.id,i]));
 const sortRoster=list=>[...list].sort((a,b)=>rosterRank.get(a.id)-rosterRank.get(b.id));
 const colors=['#8fbbff','#c3a0ee','#e6b879','#75cfc7','#df8daa'];
 const avatar=(p,extra='')=>p.image?`<img class="avatar ${extra}" src="${p.image}" alt="${p.name}" draggable="false">`:`<span class="avatar photo-empty ${extra}" aria-label="${p.name} 사진 없음">${p.name.slice(0,2)}</span>`;
-let turnOwners=[],resultsConfirmed=false,completionPrompted=false;
+let turnOwners=[],resultsConfirmed=false,completionPrompted=false,resultView='horizontal';
 const total=()=>coachMode?25:20;
 const chosen=()=>picks.filter(Boolean);
 const nextIndex=()=>{for(let i=0;i<total();i++)if(!picks[i])return i;return -1};
@@ -28,7 +28,9 @@ function removePlayer(id){
 }
 function bindRemovals(){document.querySelectorAll('[data-remove-player]').forEach(b=>b.onclick=()=>removePlayer(b.dataset.removePlayer))}
 
-let toastTimer;function toast(text){$('#toast').textContent=text;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),2600);}
+function positionToast(){const box=$('.setup').getBoundingClientRect(),notice=$('#toast');notice.style.left=`${box.left}px`;notice.style.top=`${Math.max(6,box.top-42)}px`;notice.style.width=`${box.width}px`}
+window.addEventListener('resize',positionToast);
+let toastTimer;function toast(text){positionToast();$('#toast').textContent=text;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),2600);}
 function moveCaptain(from,to){if(chosen().length)return;if(to<0||to>=order.length)return;[order[from],order[to]]=[order[to],order[from]];schedule();render();}
 function renderCaptains(){ $('#captains').innerHTML=order.map((id,i)=>`<div class="captain" draggable="${chosen().length===0}" data-captain="${id}"><span class="num">${i+1}</span>${avatar(byId(id))}<div><strong>${id}</strong><small>돌격 · 팀장</small></div><div class="arrows"><button aria-label="${id} 순서 앞으로" data-move="${i}" data-delta="-1" ${chosen().length>0||i===0?'disabled':''}>‹</button><button aria-label="${id} 순서 뒤로" data-move="${i}" data-delta="1" ${chosen().length>0||i===4?'disabled':''}>›</button></div></div>`).join('');
  $('#start').hidden=started;$('#edit-order').hidden=true;$('#coach-mode').disabled=started;$('#coach-mode').checked=coachMode;$('#order-help').hidden=false;$('#order-help').textContent=chosen().length?'순서 확정':'드래그로 위치 교환';$('#setup-hint').textContent='버튼을 누르거나 선수를 선택하면 순서가 확정됩니다';
@@ -65,29 +67,25 @@ function renderResults(){
  if(!screen){screen=document.createElement('section');screen.id='results';screen.setAttribute('aria-label','최종 팀 구성');document.body.append(screen)}
  const complete=chosen().length===total()&&(coachMode||Object.keys(coaches).length===5);
  if(!complete){resultsConfirmed=false;completionPrompted=false}
- let confirmation=$('#finish-confirm');
- if(!confirmation){
-  confirmation=document.createElement('dialog');confirmation.id='finish-confirm';
-  confirmation.setAttribute('aria-labelledby','finish-title');
-  confirmation.innerHTML='<h2 id="finish-title">최종 팀 구성을 확정하시겠습니까?</h2><p>확정하면 전체 팀 구성 화면으로 이동합니다.</p><div class="dialog-actions"><button class="secondary" id="finish-edit">계속 수정</button><button class="primary" id="finish-accept">확정</button></div>';
-  document.body.append(confirmation);
-  $('#finish-edit').onclick=()=>confirmation.close();
-  $('#finish-accept').onclick=()=>{resultsConfirmed=true;confirmation.close();render()};
- }
- if(!complete&&confirmation.open)confirmation.close();
  if(complete&&!resultsConfirmed){
-  const button=document.createElement('button');button.className='primary';button.textContent='팀 구성 확정';button.onclick=()=>confirmation.showModal();
+  const button=document.createElement('button');button.id='confirm-team';button.className='primary';button.textContent='팀 구성 확정';button.onclick=()=>{resultsConfirmed=true;render()};
   $('#turn-banner').append(button);
-  if(!completionPrompted){completionPrompted=true;confirmation.showModal()}
  }
  screen.hidden=!(complete&&resultsConfirmed);document.body.classList.toggle('show-results',complete&&resultsConfirmed);
  if(!complete||!resultsConfirmed)return;
- screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>선발이 완료되었습니다. 돌격 카드를 눌러 탱커를 교체할 수 있습니다. 다른 팀의 탱커를 선택하면 서로 교환됩니다.</p></div><div class="results-actions"><button class="secondary" id="edit-draft">수정하기</button><button class="primary" id="restart-draft">드래프트 다시하기</button></div></div><div class="results-grid">${order.map((team,i)=>{
+ screen.classList.toggle('vertical-view',resultView==='vertical');
+ screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>선발이 완료되었습니다. 돌격 카드를 드래그하거나 클릭해 다른 팀의 탱커와 교환할 수 있습니다.</p></div><div class="results-actions"><div class="view-switch" aria-label="팀 구성 보기"><button class="secondary" data-view="horizontal" aria-pressed="${resultView==='horizontal'}">가로 보기</button><button class="secondary" data-view="vertical" aria-pressed="${resultView==='vertical'}">세로 보기</button></div><button class="secondary" id="edit-draft">수정하기</button><button class="primary" id="restart-draft">드래프트 다시하기</button></div></div><div class="results-grid">${order.map((team,i)=>{
  const roster=chosen().filter(p=>p.team===team).map(p=>byId(p.player));
  if(!coachMode&&coaches[team])roster.push(byId(coaches[team]));
- return `<article class="result-team" style="--team-color:${colors[i]}" aria-label="${tanks[team]} 팀"><div class="result-team-title"><small>TEAM ${String(i+1).padStart(2,'0')}</small><h2>${tanks[team]} 팀</h2></div><div class="result-roster">${['tank','damage','support','coach'].map(role=>{const list=role==='tank'?[byId(tanks[team])]:sortRoster(roster.filter(p=>p.role===role));return `<div class="result-role"><span>${roles[role]}</span><div>${list.map(p=>role==='tank'?`<div class="result-member"><button class="result-portrait result-tank" data-edit-tank="${team}" aria-label="${p.name} 탱커 교체" title="탱커 교체">${avatar(p)}</button></div>`:`<div class="result-member"><div class="result-portrait">${avatar(p)}</div></div>`).join('')}</div></div>`}).join('')}</div></article>`
+ return `<article class="result-team" style="--team-color:${colors[i]}" aria-label="${tanks[team]} 팀"><div class="result-team-title"><small>TEAM ${String(i+1).padStart(2,'0')}</small><h2>${tanks[team]} 팀</h2></div><div class="result-roster">${['tank','damage','support','coach'].map(role=>{const list=role==='tank'?[byId(tanks[team])]:sortRoster(roster.filter(p=>p.role===role));return `<div class="result-role"><span>${roles[role]}</span><div>${list.map(p=>role==='tank'?`<div class="result-member"><button class="result-portrait result-tank" draggable="true" data-edit-tank="${team}" aria-label="${p.name} 탱커 교체" title="탱커 교체">${avatar(p)}</button></div>`:`<div class="result-member"><div class="result-portrait">${avatar(p)}</div></div>`).join('')}</div></div>`}).join('')}</div></article>`
  }).join('')}</div>`;
- document.querySelectorAll('[data-edit-tank]').forEach(b=>b.onclick=()=>openTankPicker(b.dataset.editTank));
+ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{resultView=b.dataset.view;renderResults();bindRemovals()});
+ document.querySelectorAll('[data-edit-tank]').forEach(b=>{
+ b.onclick=()=>openTankPicker(b.dataset.editTank);
+ b.ondragstart=e=>{e.dataTransfer.setData('application/x-result-tank',b.dataset.editTank);e.dataTransfer.effectAllowed='move'};
+ b.ondragover=e=>{if(e.dataTransfer.types.includes('application/x-result-tank'))e.preventDefault()};
+ b.ondrop=e=>{e.preventDefault();const source=e.dataTransfer.getData('application/x-result-tank'),target=b.dataset.editTank;if(source===target||!order.includes(source))return;[tanks[source],tanks[target]]=[tanks[target],tanks[source]];render()};
+ });
  $('#edit-draft').onclick=()=>{resultsConfirmed=false;completionPrompted=true;render();window.scrollTo(0,0)};
  $('#restart-draft').onclick=()=>{reset(true);window.scrollTo(0,0)};
 }
