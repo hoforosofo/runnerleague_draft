@@ -28,7 +28,7 @@ function removePlayer(id){
 }
 function bindRemovals(){document.querySelectorAll('[data-remove-player]').forEach(b=>b.onclick=()=>removePlayer(b.dataset.removePlayer))}
 
-function positionToast(){const box=$('.setup').getBoundingClientRect(),notice=$('#toast');notice.style.left=`${box.left}px`;notice.style.top=`${Math.max(6,box.top-42)}px`;notice.style.width=`${box.width}px`}
+function positionToast(){const box=$('.setup').getBoundingClientRect(),notice=$('#toast');notice.style.left=`${box.left}px`;const header=document.querySelector('header').getBoundingClientRect();notice.style.top=`${Math.max(8,header.top+header.height/2-16)}px`;notice.style.width=`${box.width}px`}
 window.addEventListener('resize',positionToast);
 let toastTimer;function toast(text){positionToast();$('#toast').textContent=text;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),2600);}
 function moveCaptain(from,to){if(chosen().length)return;if(to<0||to>=order.length)return;[order[from],order[to]]=[order[to],order[from]];schedule();render();}
@@ -139,9 +139,11 @@ function validSnapshot(s){
  const ids=[...selected.map(p=>p.player),...coachIds];if(new Set(ids).size!==ids.length)return false;
  return s.order.every(t=>['damage','support','coach'].every(role=>selected.filter(p=>p.team===t&&byId(p.player).role===role).length<=(role==='coach'&&!s.coachMode?0:caps[role])));
 }
+let saveNoticeTimer;
+function showSaveNotice(){let notice=$('#save-notice');if(!notice){notice=document.createElement('div');notice.id='save-notice';notice.setAttribute('role','status');document.body.append(notice)}notice.textContent='저장되었습니다. 불러오기 버튼을 통해서 불러올 수 있습니다.';notice.classList.add('show');clearTimeout(saveNoticeTimer);saveNoticeTimer=setTimeout(()=>notice.classList.remove('show'),4500)}
 function saveDraft(){
- try{const saves=readSavedDrafts(),now=new Date(),entry={id:crypto.randomUUID(),name:`임시저장 ${now.toLocaleString('ko-KR')}`,savedAt:now.toISOString(),state:snapshotDraft()};saves.unshift(entry);localStorage.setItem(SAVE_KEY,JSON.stringify(saves));toast('현재 드래프트를 임시저장했습니다.');openSavedDrafts()}
- catch(error){toast('임시저장에 실패했습니다. 브라우저 저장 공간을 확인해 주세요.');console.error(error)}
+ let dialog=$('#save-name-dialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='save-name-dialog';dialog.setAttribute('aria-labelledby','save-name-title');dialog.innerHTML='<form id="save-name-form"><h2 id="save-name-title">임시저장</h2><label for="draft-save-name">저장 이름</label><input id="draft-save-name" type="text" maxlength="80" autocomplete="off"><p>이름을 입력하지 않으면 기본 이름으로 저장됩니다.</p><div class="dialog-actions"><button type="button" class="secondary" id="cancel-save-name">취소</button><button type="submit" class="primary" id="accept-save-name">저장</button></div></form>';document.body.append(dialog);$('#cancel-save-name').onclick=()=>dialog.close();$('#save-name-form').onsubmit=e=>{e.preventDefault();try{const saves=readSavedDrafts(),now=new Date(),name=$('#draft-save-name').value.trim()||`임시저장 ${now.toLocaleString('ko-KR')}`,entry={id:crypto.randomUUID(),name,savedAt:now.toISOString(),state:snapshotDraft()};saves.unshift(entry);localStorage.setItem(SAVE_KEY,JSON.stringify(saves));dialog.close();showSaveNotice()}catch(error){toast('임시저장에 실패했습니다. 브라우저 저장 공간을 확인해 주세요.');console.error(error)}}}
+ const input=$('#draft-save-name');input.value='';input.placeholder=`임시저장 ${new Date().toLocaleString('ko-KR')}`;dialog.showModal();input.focus();
 }
 function loadDraft(id){
  try{const saved=readSavedDrafts().find(entry=>entry.id===id);if(!saved||!validSnapshot(saved.state))throw Error('유효하지 않은 저장');const state=saved.state;
