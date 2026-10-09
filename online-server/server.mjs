@@ -8,18 +8,21 @@ const byId=id=>players.find(p=>p.id===id);
 const allowedOrigins=new Set((process.env.ALLOWED_ORIGINS||'https://hoforosofo.github.io,http://127.0.0.1:8766,http://localhost:8766').split(',').map(v=>v.trim()));
 const storage=process.env.DATA_DIR?path.join(process.env.DATA_DIR,'rooms.json'):null;
 const rooms=new Map();
+const botWaits=new Map();
+const reconnectGrace=Number(process.env.RECONNECT_GRACE_MS)||30000;
+const vacantDelay=Number(process.env.AUTO_PICK_DELAY_MS)||3000;
 if(storage){fs.mkdirSync(path.dirname(storage),{recursive:true});if(fs.existsSync(storage)){for(const r of JSON.parse(fs.readFileSync(storage,'utf8'))){r.sockets=new Map();rooms.set(r.code,r)}}}
 function persist(){if(!storage)return;const data=[...rooms.values()].map(({sockets,...r})=>r);fs.writeFileSync(storage+'.tmp',JSON.stringify(data));fs.renameSync(storage+'.tmp',storage)}
 const sha=value=>crypto.createHash('sha256').update(value).digest('hex');
 const token=()=>crypto.randomBytes(32).toString('base64url');
-function initial(){return {order:[...initialOrder],picks:[],turnOwners:Array.from({length:20},(_,i)=>initialOrder[Math.floor(i/5)%2?4-i%5:i%5]),coachMode:false,coaches:{},tanks:Object.fromEntries(initialOrder.map(t=>[t,t])),started:false,resultsConfirmed:false}}
+function initial(){return {order:[...initialOrder],picks:[],turnOwners:Array.from({length:20},(_,i)=>initialOrder[Math.floor(i/5)%2?4-i%5:i%5]),coachMode:false,autoPick:true,coaches:{},tanks:Object.fromEntries(initialOrder.map(t=>[t,t])),started:false,resultsConfirmed:false}}
 const selected=r=>r.state.picks.filter(Boolean);
 const count=r=>r.state.coachMode?25:20;
 function nextIndex(r){for(let i=0;i<count(r);i++)if(!r.state.picks[i])return i;return -1}
 function schedule(r){const s=r.state,remaining=Object.fromEntries(s.order.map(t=>[t,count(r)/5-selected(r).filter(p=>p.team===t).length]));const queue=[];for(let round=0;queue.length<count(r)-selected(r).length;round++)for(const t of round%2?[...s.order].reverse():s.order)if(remaining[t]>0){queue.push(t);remaining[t]--}s.turnOwners=Array.from({length:count(r)},(_,i)=>s.picks[i]?.team||queue.shift())}
 function view(r){return {code:r.code,name:r.name,revision:r.revision,hostId:r.hostId,members:r.members.map(({tokenHash,...m})=>({...m,connected:r.sockets.has(m.id)})),state:r.state,updatedAt:r.updatedAt}}
 function emit(r){const data=JSON.stringify({type:'state',room:view(r)});for(const socket of r.sockets.values())if(socket.readyState===WebSocket.OPEN)socket.send(data)}
-function commit(r){r.revision++;r.updatedAt=Date.now();persist();emit(r)}
+function commit(r){botWaits.delete(r.code);r.revision++;r.updatedAt=Date.now();persist();emit(r)}
 function member(r,value){return r.members.find(m=>m.tokenHash===sha(String(value||'')))}
 function requireHost(r,m){if(m.id!==r.hostId)throw Error('방장만 실행할 수 있습니다.')}
 function command(r,m,action,data={}){
@@ -30,14 +33,14 @@ function command(r,m,action,data={}){
   if(m.team)throw Error('이미 팀을 선택했습니다.');
   const waiting=r.members.find(p=>!p.team&&!p.spectator);
   if(waiting?.id!==m.id)throw Error('앞서 입장한 참가자가 먼저 팀을 선택해야 합니다.');
-  if(r.members.some(p=>p.team===data.team))throw Error('이미 선택된 팀입니다.');m.team=data.team;if(initialOrder.every(t=>r.members.some(p=>p.team===t)))for(const p of r.members)if(!p.team)p.spectator=true;
+  if(r.members.some(p=>p.team===data.team))throw Error('이미 선택된 팀입니다.');m.team=data.team;botWaits.delete(r.code);if(initialOrder.every(t=>r.members.some(p=>p.team===t)))for(const p of r.members)if(!p.team)p.spectator=true;
  }else if(action==='spectate'){
   requireHost(r,m);if(s.started||m.team)throw Error('준비 중에만 관전으로 변경할 수 있습니다.');m.spectator=true;
  }else if(action==='start'){
-  requireHost(r,m);if(s.started)throw Error('이미 시작했습니다.');if(initialOrder.some(t=>!r.members.some(p=>p.team===t)))throw Error('5개 팀의 팀장이 모두 선택되어야 합니다.');
-  if(r.members.some(p=>p.team&&!r.sockets.has(p.id)))throw Error('팀장이 모두 접속한 뒤 시작하세요.');s.started=true;
+  requireHost(r,m);if(s.started)throw Error('이미 시작했습니다.');if(!s.autoPick&&initialOrder.some(t=>!r.members.some(p=>p.team===t)))throw Error('5개 팀의 팀장이 모두 선택되어야 합니다.');
+  if(!s.autoPick&&r.members.some(p=>p.team&&!r.sockets.has(p.id)))throw Error('팀장이 모두 접속한 뒤 시작하세요.');s.started=true;
  }else if(action==='order'){
-  requireHost(r,m);if(s.started||selected(r).length)throw Error('시작 후 순서를 변경할 수 없습니다.');const {from,to}=data;if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||to<0||from>4||to>4)throw Error('잘못된 순서');[s.order[from],s.order[to]]=[s.order[to],s.order[from]];schedule(r);
+  requireHost(r,m);if(selected(r).length)throw Error('선발 후 순서를 변경할 수 없습니다.');const {from,to}=data;if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||to<0||from>4||to>4)throw Error('잘못된 순서');[s.order[from],s.order[to]]=[s.order[to],s.order[from]];schedule(r);
  }else if(action==='coachMode'){
   requireHost(r,m);if(selected(r).length)throw Error('선발 후 변경할 수 없습니다.');s.coachMode=!!data.enabled;s.coaches={};schedule(r);
  }else if(action==='pick'){
@@ -75,7 +78,7 @@ const server=http.createServer(async(req,res)=>{
  if(req.method!=='POST')return sendJSON(res,404,{error:'찾을 수 없습니다.'});if(!rate(req.socket.remoteAddress))return sendJSON(res,429,{error:'잠시 후 다시 시도하세요.'});
  try{let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>4096)throw Error('요청이 너무 큽니다.')}const data=JSON.parse(raw||'{}'),name=String(data.name||'참가자').trim().slice(0,24)||'참가자';
  if(req.url==='/rooms'){
-  if(rooms.size>=1000)throw Error('현재 방이 너무 많습니다.');let code;do{code=crypto.randomBytes(4).toString('hex').slice(0,6).toUpperCase()}while(rooms.has(code));const secret=token(),id=crypto.randomUUID(),r={code,name:String(data.roomName||'러너리그 드래프트').slice(0,50),hostId:id,revision:0,updatedAt:Date.now(),members:[{id,name,team:null,spectator:false,tokenHash:sha(secret)}],state:initial(),sockets:new Map()};rooms.set(code,r);persist();return sendJSON(res,201,{code,token:secret,memberId:id});
+  if(rooms.size>=1000)throw Error('현재 방이 너무 많습니다.');let code;do{code=crypto.randomBytes(4).toString('hex').slice(0,6).toUpperCase()}while(rooms.has(code));const secret=token(),id=crypto.randomUUID(),r={code,name:String(data.roomName||'러너리그 드래프트').slice(0,50),hostId:id,revision:0,updatedAt:Date.now(),members:[{id,name,team:null,spectator:false,tokenHash:sha(secret)}],state:initial(),sockets:new Map()};if(data.order!==undefined){if(!Array.isArray(data.order)||data.order.length!==5||new Set(data.order).size!==5||!data.order.every(t=>initialOrder.includes(t)))throw Error('드래프트 순서를 확인하세요.');r.state.order=[...data.order];schedule(r)}r.state.autoPick=data.autoPick!==false;rooms.set(code,r);persist();return sendJSON(res,201,{code,token:secret,memberId:id});
  }
  const match=req.url.match(/^\/rooms\/([A-Z0-9]{6})\/join$/);if(!match)return sendJSON(res,404,{error:'찾을 수 없습니다.'});const r=rooms.get(match[1]);if(!r)throw Error('방을 찾을 수 없습니다.');
  const old=member(r,data.token);if(old)return sendJSON(res,200,{code:r.code,token:data.token,memberId:old.id});if(r.state.started)throw Error('이미 시작한 방입니다. 기존 참가자는 재접속할 수 있습니다.');if(r.members.length>=20)throw Error('참가 인원이 가득 찼습니다.');const secret=token(),id=crypto.randomUUID();r.members.push({id,name,team:null,spectator:initialOrder.every(t=>r.members.some(m=>m.team===t)),tokenHash:sha(secret)});commit(r);return sendJSON(res,201,{code:r.code,token:secret,memberId:id});
@@ -83,9 +86,26 @@ const server=http.createServer(async(req,res)=>{
 });
 const wss=new WebSocketServer({noServer:true,maxPayload:8192});
 server.on('upgrade',(req,socket,head)=>{if(req.url!=='/ws'||!allowedOrigins.has(req.headers.origin)){socket.destroy();return}wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws))});
-wss.on('connection',ws=>{let room=null,me=null;const timer=setTimeout(()=>ws.close(1008,'인증 시간 초과'),10000);let windowAt=Date.now(),messages=0;ws.on('message',raw=>{let requestId=null;try{if(Date.now()-windowAt>1000){windowAt=Date.now();messages=0}if(++messages>30)throw Error('요청이 너무 빠릅니다.');const msg=JSON.parse(String(raw));requestId=msg.requestId;if(!room){if(msg.type!=='auth')throw Error('인증이 필요합니다.');room=rooms.get(msg.code);me=room&&member(room,msg.token);if(!me){room=null;throw Error('재접속 정보가 유효하지 않습니다.')}clearTimeout(timer);const previous=room.sockets.get(me.id);room.sockets.set(me.id,ws);if(previous&&previous!==ws)previous.close(4001,'다른 탭에서 접속했습니다.');emit(room);return}
+wss.on('connection',ws=>{let room=null,me=null;const timer=setTimeout(()=>ws.close(1008,'인증 시간 초과'),10000);let windowAt=Date.now(),messages=0;ws.on('message',raw=>{let requestId=null;try{if(Date.now()-windowAt>1000){windowAt=Date.now();messages=0}if(++messages>30)throw Error('요청이 너무 빠릅니다.');const msg=JSON.parse(String(raw));requestId=msg.requestId;if(!room){if(msg.type!=='auth')throw Error('인증이 필요합니다.');room=rooms.get(msg.code);me=room&&member(room,msg.token);if(!me){room=null;throw Error('재접속 정보가 유효하지 않습니다.')}clearTimeout(timer);const previous=room.sockets.get(me.id);room.sockets.set(me.id,ws);if(room.state.turnOwners[nextIndex(room)]===me.team)botWaits.delete(room.code);if(previous&&previous!==ws)previous.close(4001,'다른 탭에서 접속했습니다.');emit(room);return}
  if(msg.type!=='command')return;if(msg.revision!==room.revision){ws.send(JSON.stringify({type:'error',requestId,message:'화면이 갱신되었습니다. 다시 시도해 주세요.'}));emit(room);return}command(room,me,msg.action,msg.data);ws.send(JSON.stringify({type:'ack',requestId}));
  }catch(e){ws.send(JSON.stringify({type:'error',requestId,message:e.message}));}});ws.on('close',()=>{clearTimeout(timer);if(room&&room.sockets.get(me.id)===ws){room.sockets.delete(me.id);emit(room)}});ws.on('pong',()=>{ws.isAlive=true});ws.isAlive=true});
+
+// No external AI API: respect roster capacities and balance role counts.
+function automaticChoice(r,team){
+ const picked=selected(r),options=players.filter(p=>eligible(p,team,picked,r.state.coachMode));
+ const roleCount=role=>picked.filter(p=>p.team===team&&byId(p.player).role===role).length;
+ const least=Math.min(...options.map(p=>roleCount(p.role)/caps[p.role]));
+ const balanced=options.filter(p=>roleCount(p.role)/caps[p.role]===least);
+ return balanced.length?balanced[crypto.randomInt(balanced.length)]:null;
+}
+setInterval(()=>{for(const r of rooms.values()){
+ if(!r.state.started||r.state.resultsConfirmed||!r.state.autoPick||!r.sockets.size){botWaits.delete(r.code);continue}
+ const index=nextIndex(r),team=r.state.turnOwners[index],owner=r.members.find(m=>m.team===team);
+ if(index<0||owner&&r.sockets.has(owner.id)){botWaits.delete(r.code);continue}
+ let wait=botWaits.get(r.code);if(!wait||wait.index!==index){wait={index,until:Date.now()+(owner?reconnectGrace:vacantDelay)};botWaits.set(r.code,wait)}
+ if(Date.now()<wait.until)continue;const player=automaticChoice(r,team);if(player){r.state.picks[index]={player:player.id,team,automatic:true};commit(r)}
+}},500).unref();
+
 const heartbeat=setInterval(()=>{for(const ws of wss.clients){if(!ws.isAlive){ws.terminate();continue}ws.isAlive=false;ws.ping()}},30000);heartbeat.unref();
 setInterval(()=>{const cutoff=Date.now()-7*86400000;for(const [code,r] of rooms)if(!r.sockets.size&&r.updatedAt<cutoff)rooms.delete(code);for(const [ip,v] of rates)if(Date.now()-v.at>60000)rates.delete(ip);persist()},3600000).unref();
 server.listen(Number(process.env.PORT||8787),'0.0.0.0',()=>console.log('Runner League server ready'));

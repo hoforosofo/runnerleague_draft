@@ -181,3 +181,5 @@ body:has(#toast.show) .online-room-bar{visibility:hidden}
 .no-coaches .result-roster{grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,2fr)}
 .no-coaches #results.vertical-view .result-roster{grid-template-columns:1fr;grid-template-rows:repeat(5,minmax(0,1fr))}
 @media(max-width:700px){.no-coaches .result-roster{grid-template-columns:1fr;grid-template-rows:repeat(3,140px)}}
+
+#create-settings{border:1px solid #dce5f2;border-radius:8px;padding:10px;margin-top:14px}#create-settings summary{cursor:pointer;font-weight:650}#create-order{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}#online-menu #create-order label{font-size:11px;margin:10px 0 5px}#create-order select{display:block;width:100%;font:inherit;padding:6px 2px;margin-top:5px;border:1px solid #d7e2ef;border-radius:5px;background:#fff;color:#17243b}#online-menu .auto-pick-label{display:flex;align-items:center;gap:6px;margin:10px 0 0}#online-menu #create-auto-pick{width:14px;margin:0}#create-settings p{font-size:11px;margin:8px 0 0}#online-menu{max-height:calc(100dvh - 32px);overflow:auto}
