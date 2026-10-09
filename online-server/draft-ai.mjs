@@ -2,16 +2,16 @@ import {players,eligible,teamAt} from './model.mjs';
 
 // Provisional judgments from the supplied 2026-10-08~10 community export.
 // Scores are policy weights, not measured skill, win rates, or trained parameters.
-export const EVIDENCE_AS_OF='2026-10-10T04:58:00+09:00';
+export const EVIDENCE_AS_OF='2026-10-10T05:16:00+09:00';
 // Latest dated observations override older preferences; unobserved players retain user ranks.
-export const POLICY_VERSION='runnerleague-community-v3.1';
+export const POLICY_VERSION='runnerleague-community-v4';
 const profiles={
  '김뿡':{value:94,flex:8,carry:9},'뱅':{value:92,flex:6,carry:9},
- '디디디용':{value:83,flex:9,carry:6},'마뫄':{value:80,flex:6,carry:6,uncertain:true},
- '큐베':{value:70,flex:5,carry:5,uncertain:true},'엘리':{value:68,flex:7,carry:4},
- '설백':{value:63,flex:4,carry:3,call:5},'뀨냥냥':{value:55,flex:3,carry:2,uncertain:true},
- '정령왕':{value:54,flex:3,carry:3,uncertain:true},'꼴랑이':{value:51,flex:2,carry:2,uncertain:true},
- '양아지':{value:96,style:'hybrid',order:4,flex:9},
+ '디디디용':{value:88,flex:9,carry:6},'마뫄':{value:85,flex:6,carry:6,uncertain:true},
+ '큐베':{value:80,flex:5,carry:5,uncertain:true},'엘리':{value:72,flex:7,carry:4},
+ '설백':{value:52,flex:4,carry:3,call:2},'뀨냥냥':{value:48,flex:3,carry:2,uncertain:true},
+ '정령왕':{value:47,flex:3,carry:3,uncertain:true},'꼴랑이':{value:46,flex:2,carry:2,uncertain:true},
+ '양아지':{value:122,style:'hybrid',order:4,flex:9},
  '남봉':{value:86,style:'attack',order:10,flex:7},
  '인섹':{value:80,style:'attack',order:9,flex:5},
  '아야츠노 유니':{value:82,style:'hybrid',order:3,flex:8},
@@ -42,16 +42,15 @@ function teamValue(picks,team){
  value+=damage.reduce((sum,p)=>sum+profile(p).flex*0.6+(profile(p).call||0),0);
  value+=support.reduce((sum,p)=>sum+profile(p).flex*0.5,0);
  const leadership=Math.max(0,...support.map(p=>profile(p).order||0));
- value+=leadership*6*(orderNeed[team]||0);
- // Latest observations: CuVee's positioning is contested; avoid compounding tank instability.
- if(['룩삼','콩콩'].includes(team)&&damage.some(p=>p.id==='큐베'))value-=5;
+ value+=Math.min(20,leadership*2*(orderNeed[team]||0));
+
  if(support.length===2)value+=pairBonus(...support);
  if(team==='울프'&&support.some(p=>p.id==='임나은'))value+=12;
  if(damage.length===2){
   // Two development-heavy damage slots remain risky even with strong supports.
   const weak=damage.filter(p=>profile(p).value<64).length;
   if(weak===2)value-=team==='울프'?18:32;
-  if(damage.some(p=>p.id==='설백')&&damage.some(p=>profile(p).carry>=6))value+=8;
+  if(damage.some(p=>p.id==='설백')&&damage.some(p=>profile(p).carry>=6))value+=3;
   const strongest=Math.max(...damage.map(p=>profile(p).carry));
   value+=strongest*1.5;
  }
@@ -79,7 +78,7 @@ function immediate(state,team,picks,p,scenario=0){
  }else if(p.role==='support'){
   if(!support)score+=8;
   // Latest 04:18~04:35 discussions: early support-first can lose the damage pool.
-  if(!roster.length&&state.order.indexOf(team)<2)score-=28;
+  if(!roster.length&&state.order.indexOf(team)<2)score-=8;
   if(scenario===2)score+=(profile(p).order||0)*(orderNeed[team]||0)*2;
   if(wolfSupportPlan(state,team,picks))score+=48;
  }
@@ -120,7 +119,7 @@ export function chooseDraftPlayer(state,team){
  const scored=legal.map(player=>{
   const forecasts=[0,1,2].map(scenario=>project(state,team,index,player,scenario));
   const scores=forecasts.map(f=>f.score);
-  return {player,score:(player.role==='damage'&&preferredWolfDamage.has(player.id)&&!rosterOf(picked,team).some(p=>p.role==='damage')?(state.order.indexOf(team)<2&&rosterOf(picked,team).length===0?42:12):0)+Math.min(...scores)*0.65+scores.reduce((a,b)=>a+b,0)/scores.length*0.35+immediate(state,team,picked,player)*0.12};
+  return {player,score:(player.role==='damage'&&preferredWolfDamage.has(player.id)&&!rosterOf(picked,team).some(p=>p.role==='damage')?12:0)+Math.min(...scores)*0.65+scores.reduce((a,b)=>a+b,0)/scores.length*0.35+immediate(state,team,picked,player)*0.12};
  }).sort((a,b)=>b.score-a.score||players.indexOf(a.player)-players.indexOf(b.player));
  const player=scored[0].player,roster=rosterOf(picked,team);
  const laterOwn=turns.some((t,i)=>i>index&&t===team&&!state.picks[i]);

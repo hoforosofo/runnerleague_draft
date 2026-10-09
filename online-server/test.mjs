@@ -53,12 +53,11 @@ test('Community policy: conditional Wolf strategy, deterministic legal complete 
  assert.equal(JSON.stringify(available),before);
  assert.deepEqual(chooseDraftPlayer(available,'울프'),first);
  available.picks.push({player:first.player.id,team:'울프'});
- assert.equal(chooseDraftPlayer(available,'울프').player.role,'support');
+ assert.ok(eligible(chooseDraftPlayer(available,'울프').player,'울프',available.picks,false));
  const depleted=state(prefix(['김뿡','뱅','디디디용','마뫄']),wolfOrder);
- const a=chooseDraftPlayer(depleted,'울프');assert.equal(a.player.role,'support');
- assert.match(a.reason,/지원 중심/);
+ const a=chooseDraftPlayer(depleted,'울프');assert.ok(['큐베','양아지'].includes(a.player.id));
  depleted.picks.push({player:a.player.id,team:'울프'});
- assert.equal(chooseDraftPlayer(depleted,'울프').player.role,'support');
+ const b=chooseDraftPlayer(depleted,'울프');assert.deepEqual(new Set([a.player.id,b.player.id]),new Set(['큐베','양아지']));
  // A remaining base healer must remain legal alongside Nam-bong.
  const pairing=state([{player:'남봉',team:'둥그레'},{player:'김뿡',team:'둥그레'},{player:'뱅',team:'둥그레'},...players.filter(p=>p.role==='support'&&!['남봉','담유이'].includes(p.id)).map(p=>({player:p.id,team:'룩삼'}))]);
  assert.equal(chooseDraftPlayer(pairing,'둥그레').player.id,'담유이');
@@ -90,4 +89,15 @@ test('User ranking is shared and last team pick never claims a future turn',()=>
 test('Reasons are one short sentence without rank labels',()=>{
  const s={order:initialOrder,picks:[],coachMode:false};
  for(let i=0;i<20;i++){const team=teamAt(i,s.order),c=chooseDraftPlayer(s,team);assert.ok(c.reason.length<65);assert.doesNotMatch(c.reason,/순위|[0-9]+위|사용자 지정| · /);s.picks.push({player:c.player.id,team})}
+});
+
+test('Tier gaps survive composition bonuses across captain orders',()=>{
+ for(let shift=0;shift<5;shift++){
+  const order=[...initialOrder.slice(shift),...initialOrder.slice(0,shift)],s={order,picks:[],coachMode:false};
+  for(let i=0;i<20;i++){const team=teamAt(i,order),c=chooseDraftPlayer(s,team);s.picks.push({player:c.player.id,team})}
+  const at=id=>s.picks.findIndex(p=>p.player===id);
+  assert.ok(at('큐베')<at('엘리'),JSON.stringify(s.picks));
+  for(const id of ['설백','뀨냥냥','정령왕','꼴랑이'])assert.ok(at('엘리')<at(id));
+  assert.ok(at('양아지')<6,'Standout support should be secured by first turn-around in these scenarios');
+ }
 });
