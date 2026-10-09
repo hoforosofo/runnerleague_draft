@@ -127,11 +127,11 @@ export function chooseDraftPlayer(state,team){
  if(legal.length===1)reason='선택 가능한 선수가 이 선수만 남았습니다.';
  else if(player.role==='coach')reason='선수 구성을 마쳐 남은 코치를 선택했습니다.';
  else if(!laterOwn)reason='남은 후보 중 현재 팀 구성을 완성할 선수로 골랐습니다.';
- else if(player.role==='support'&&wolfSupportPlan(state,team,picked))reason='공격수가 먼저 빠져 지원 중심 구성을 골랐습니다.';
+ else if(player.role==='support'&&wolfSupportPlan(state,team,picked))reason='딜러가 먼저 빠져 힐러 중심 구성을 골랐습니다.';
  else if(player.role==='support'&&profile(player).order>=6&&orderNeed[team]>=1)reason='팀의 오더를 보완하려고 골랐습니다.';
  else if(player.role==='support'&&team==='울프'&&player.id==='임나은')reason='울프와의 호흡을 고려해 골랐습니다.';
- else if(player.role==='support'&&roster.some(p=>p.role==='support'))reason='먼저 뽑은 지원 선수와의 조합을 고려했습니다.';
- else if(player.role==='damage'&&preferredWolfDamage.has(player.id))reason='공격수를 먼저 확보하려고 골랐습니다.';
+ else if(player.role==='support'&&roster.some(p=>p.role==='support'))reason='먼저 뽑은 힐러와의 조합을 고려했습니다.';
+ else if(player.role==='damage'&&preferredWolfDamage.has(player.id))reason='딜러를 먼저 확보하려고 골랐습니다.';
  else reason='남은 후보 중 팀 조합이 더 낫다고 예상했습니다.';
  return {player,reason,policyVersion:POLICY_VERSION};
 }

@@ -92,8 +92,9 @@ test('Reasons are one short sentence without rank labels',()=>{
 });
 
 test('Tier gaps survive composition bonuses across captain orders',()=>{
+ const baseline=['둥그레','룩삼','울프','콩콩','푸린'];
  for(let shift=0;shift<5;shift++){
-  const order=[...initialOrder.slice(shift),...initialOrder.slice(0,shift)],s={order,picks:[],coachMode:false};
+  const order=[...baseline.slice(shift),...baseline.slice(0,shift)],s={order,picks:[],coachMode:false};
   for(let i=0;i<20;i++){const team=teamAt(i,order),c=chooseDraftPlayer(s,team);s.picks.push({player:c.player.id,team})}
   const at=id=>s.picks.findIndex(p=>p.player===id);
   assert.ok(at('큐베')<at('엘리'),JSON.stringify(s.picks));

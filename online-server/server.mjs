@@ -31,10 +31,9 @@ function command(r,m,action,data={}){
  if(action==='claim'){
   if(s.started)throw Error('드래프트가 시작되어 팀을 변경할 수 없습니다.');
   if(!initialOrder.includes(data.team))throw Error('팀을 선택하세요.');
-  if(m.team)throw Error('이미 팀을 선택했습니다.');
   const waiting=r.members.find(p=>!p.team&&!p.spectator);
-  if(waiting?.id!==m.id)throw Error('앞서 입장한 참가자가 먼저 팀을 선택해야 합니다.');
-  if(r.members.some(p=>p.team===data.team))throw Error('이미 선택된 팀입니다.');m.team=data.team;botWaits.delete(r.code);if(initialOrder.every(t=>r.members.some(p=>p.team===t)))for(const p of r.members)if(!p.team)p.spectator=true;
+  if(!m.team&&waiting?.id!==m.id)throw Error('앞서 입장한 참가자가 먼저 팀을 선택해야 합니다.');
+  if(r.members.some(p=>p.id!==m.id&&p.team===data.team))throw Error('이미 선택된 팀입니다.');m.team=data.team;m.spectator=false;botWaits.delete(r.code);if(initialOrder.every(t=>r.members.some(p=>p.team===t)))for(const p of r.members)if(!p.team)p.spectator=true;
  }else if(action==='spectate'){
   requireHost(r,m);if(s.started||m.team)throw Error('준비 중에만 관전으로 변경할 수 있습니다.');m.spectator=true;
  }else if(action==='start'){
