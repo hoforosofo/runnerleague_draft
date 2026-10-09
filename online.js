@@ -9,12 +9,16 @@ const recoveryKey=code=>`${sessionKey(code)}.${endpoint()}`;
 const recover=code=>JSON.parse(sessionStorage.getItem(sessionKey(code))||localStorage.getItem(recoveryKey(code))||'null');
 const mine=()=>room?.members.find(m=>m.id===credentials?.memberId);
 const isHost=()=>mine()?.id===room?.hostId;
+let serverOffset=0;
+function updateTimer(){const timer=$('#online-turn-timer');if(timer)timer.textContent=room?.state.turnTimer?`선택 ${Math.max(0,Math.ceil((room.state.turnTimer.deadline-Date.now()-serverOffset)/1000))}초`:''}
+setInterval(updateTimer,200);
 function refreshChrome(){
  $('#online-room-bar')?.remove();if(!room)return;
  const bar=el('div',undefined,'online-room-bar');bar.id='online-room-bar';
  const stateText=!connected?'연결 중…':!room.state.started?'팀장 선택 대기':room.state.resultsConfirmed?'팀 구성 확정':'드래프트 진행 중';
  bar.append(el('strong',`방 ${room.code} · ${stateText}`),el('span',`${mine()?.name||''} · ${mine()?.team||'관전'}${isHost()?' · 방장':''}`));
  const lobby=el('button','참가자 / 초대','secondary');lobby.onclick=openLobby;bar.append(lobby);document.querySelector('header').append(bar);
+ const timer=el('strong');timer.id='online-turn-timer';bar.append(timer);updateTimer();
  if(!room.state.started&&(!mine()?.team&&!mine()?.spectator))openLobby();
 }
 function action(name,data={}){
@@ -25,7 +29,7 @@ function action(name,data={}){
 function connect(){
  clearTimeout(retry);connected=false;const url=new URL(endpoint());url.protocol=url.protocol==='https:'?'wss:':'ws:';url.pathname='/ws';url.search='';socket=new WebSocket(url);
  socket.onopen=()=>socket.send(JSON.stringify({type:'auth',code:credentials.code,token:credentials.token}));
- socket.onmessage=e=>{const msg=JSON.parse(e.data);if(msg.type==='state'){const wasStarted=!!room?.state.started;room=msg.room;connected=true;pending=false;apply(room.state);refreshChrome();if(room.state.started&&!wasStarted){$('#online-lobby')?.close()}else if($('#online-lobby')?.open)openLobby()}else if(msg.type==='error'){pending=false;if(msg.message==='재접속 정보가 유효하지 않습니다.'){localStorage.removeItem(recoveryKey(credentials.code));sessionStorage.removeItem(sessionKey(credentials.code));localStorage.removeItem('runnerleague.active-room');sessionStorage.removeItem('runnerleague.active-room');credentials=null;socket.close();room=null;menu()}notify(msg.message);const info=$('#online-status');if(info)info.textContent=msg.message}};
+ socket.onmessage=e=>{const msg=JSON.parse(e.data);if(msg.type==='state'){const wasStarted=!!room?.state.started;room=msg.room;serverOffset=(room.serverTime||Date.now())-Date.now();connected=true;pending=false;apply(room.state);refreshChrome();if(room.state.started&&!wasStarted){$('#online-lobby')?.close()}else if($('#online-lobby')?.open)openLobby()}else if(msg.type==='error'){pending=false;if(msg.message==='재접속 정보가 유효하지 않습니다.'){localStorage.removeItem(recoveryKey(credentials.code));sessionStorage.removeItem(sessionKey(credentials.code));localStorage.removeItem('runnerleague.active-room');sessionStorage.removeItem('runnerleague.active-room');credentials=null;socket.close();room=null;menu()}notify(msg.message);const info=$('#online-status');if(info)info.textContent=msg.message}};
  socket.onclose=e=>{connected=false;pending=false;refreshChrome();if(e.code===4001){notify('다른 탭에서 같은 참가자로 접속했습니다.');return}if(credentials)retry=setTimeout(connect,1500)};
 }
 async function enter(create,name,code){
@@ -64,8 +68,8 @@ function openLobby(){
  const copy=el('button','초대 링크 복사','secondary');copy.onclick=async()=>{const url=new URL(location.href);url.searchParams.set('room',room.code);try{await navigator.clipboard.writeText(url.href);copy.textContent='복사되었습니다'}catch{notify(url.href)}};dialog.append(copy);
  const waiting=room.members.find(m=>!m.team&&!m.spectator),me=mine();dialog.append(el('p',room.state.started?'드래프트가 시작되었습니다.':waiting?`${waiting.name}님이 팀장 캐릭터를 선택할 차례입니다.`:'팀 선택이 완료되었습니다. 방장이 시작할 수 있습니다.'));
  const members=el('div',undefined,'online-members');for(const m of room.members){const row=el('div',undefined,'online-member');row.append(el('strong',`${m.name}${m.id===room.hostId?' · 방장':''}`),el('span',`${m.team||(m.spectator?'관전':'미선택')} · ${m.connected?'접속 중':room.state.autoPick?'연결 끊김 · 자동 선발 대기':'연결 끊김'}`));if(isHost()&&!room.state.started&&m.id!==me.id){const release=el('button','자리 비우기','text-btn');release.onclick=()=>action('release',{memberId:m.id});row.append(release)}members.append(row)}if(room.state.autoPick)for(const team of room.state.order)if(!room.members.some(m=>m.team===team)){const row=el('div',undefined,'online-member');row.append(el('strong',`${team} 팀`),el('span','팀장 없음 · 자동 선발'));members.append(row)}dialog.append(members);
- const teams=el('div',undefined,'online-team-options');for(const [index,team] of room.state.order.entries()){const button=el('button',undefined,'secondary');const img=el('img');img.src=players.find(p=>p.id===team).image;img.alt=team;button.append(el('small',`${index+1}번`),img,el('strong',team));button.disabled=room.state.started||(!me?.team&&waiting?.id!==me?.id)||room.members.some(m=>m.team===team);button.dataset.onlineTeam=team;button.setAttribute('aria-pressed',String(me?.team===team));button.onclick=()=>action('claim',{team});teams.append(button)}dialog.append(teams);
- if(!me?.spectator){const spectator=el('button','관전으로 전환','secondary');spectator.id='online-spectate';spectator.disabled=room.state.started&&!!me?.team&&!room.state.autoPick;spectator.onclick=()=>action('spectate');dialog.append(spectator)}
+ const teams=el('div',undefined,'online-team-options');for(const [index,team] of room.state.order.entries()){const button=el('button',undefined,'secondary');const img=el('img');img.src=players.find(p=>p.id===team).image;img.alt=team;button.append(el('small',`${index+1}번`),img,el('strong',team));button.disabled=room.members.some(m=>m.team===team);button.dataset.onlineTeam=team;button.setAttribute('aria-pressed',String(me?.team===team));button.onclick=()=>action('claim',{team});teams.append(button)}dialog.append(teams);
+ if(!me?.spectator){const spectator=el('button','관전으로 전환','secondary');spectator.id='online-spectate';spectator.onclick=()=>action('spectate');dialog.append(spectator)}
  const actions=el('div',undefined,'dialog-actions');const leave=el('button','방 나가기','secondary');leave.onclick=()=>{if(!confirm('방에서 나갈까요? 기존 방은 방 코드로 다시 접속할 수 있습니다.'))return;const previous=credentials;credentials=null;clearTimeout(retry);socket?.close();sessionStorage.removeItem('runnerleague.active-room');localStorage.removeItem('runnerleague.active-room');localStorage.setItem('runnerleague.mode','solo');const url=new URL(location.href);url.searchParams.delete('room');location.replace(url.href)};actions.append(leave);const close=el('button','화면 보기','secondary');close.onclick=()=>dialog.close();actions.append(close);if(isHost()&&!room.state.started){const start=el('button','드래프트 시작','primary');start.id='online-start';start.disabled=!room.state.autoPick&&initialOrder.some(t=>!room.members.some(m=>m.team===t&&m.connected));start.onclick=()=>{dialog.close();action('start')};actions.append(start)}dialog.append(actions);if(!dialog.open)dialog.showModal();
 }
 export const online={active:()=>!!room,host:isHost,connected:()=>connected,me:mine,action,canPick:team=>!room||connected&&room.state.started&&!room.state.resultsConfirmed&&mine()?.team===team,

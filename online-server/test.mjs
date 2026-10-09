@@ -20,7 +20,7 @@ test('Online authority, sequential claims, complete draft and server restart',as
  const clients=[];
  try{await start();const owner=await post('/rooms',{name:'방장',autoPick:false}),host=await client(owner);clients.push(host);good(await host.cmd('spectate'));const credentials=[];
  for(let i=0;i<5;i++){const c=await post(`/rooms/${owner.code}/join`,{name:'팀장'+i});credentials.push(c);clients.push(await client(c))}
- denied(await clients[2].cmd('claim',{team:initialOrder[1]}));denied(await clients[1].cmd('start'));denied(await host.cmd('start'));
+ good(await clients[2].cmd('claim',{team:initialOrder[1]}));good(await clients[2].cmd('spectate'));denied(await clients[1].cmd('start'));denied(await host.cmd('start'));
  for(let i=0;i<5;i++)good(await clients[i+1].cmd('claim',{team:initialOrder[i]}));assert.equal(host.room.state.coachMode,false);assert.equal(host.room.state.turnOwners.length,20);good(await host.cmd('coachMode',{enabled:true}));good(await host.cmd('start'));denied(await host.cmd('pick',{player:'김뿡'}));denied(await clients[2].cmd('pick',{player:'김뿡'}));denied(await clients[1].cmd('order',{from:0,to:4}));
  const staleRevision=clients[1].room.revision;good(await clients[1].cmd('pick',{player:'김뿡'}));const stale=await new Promise(resolve=>{clients[1].ws.once('message',raw=>resolve(JSON.parse(raw)));clients[1].ws.send(JSON.stringify({type:'command',action:'pick',data:{player:'디디디용'},revision:staleRevision,requestId:'stale-test'}))});denied(stale);assert.equal(host.room.state.picks.filter(Boolean).length,1);
  for(let idx=1;idx<25;idx++){const r=host.room,s=r.state,team=s.turnOwners[idx],c=clients[initialOrder.indexOf(team)+1],picked=s.picks.filter(Boolean),p=players.find(p=>eligible(p,team,picked,true));good(await c.cmd('pick',{player:p.id}))}
