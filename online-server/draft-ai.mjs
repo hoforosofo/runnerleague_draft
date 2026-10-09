@@ -2,19 +2,21 @@ import {players,eligible,teamAt} from './model.mjs';
 
 // Provisional judgments from the supplied 2026-10-08~10 community export.
 // Scores are policy weights, not measured skill, win rates, or trained parameters.
-export const POLICY_VERSION='runnerleague-community-v2';
+export const EVIDENCE_AS_OF='2026-10-10T04:58:00+09:00';
+// Latest dated observations override older preferences; unobserved players retain user ranks.
+export const POLICY_VERSION='runnerleague-community-v3';
 const profiles={
- '김뿡':{value:94,flex:8,carry:9},'뱅':{value:94,flex:6,carry:9},
+ '김뿡':{value:94,flex:8,carry:9},'뱅':{value:92,flex:6,carry:9},
  '디디디용':{value:83,flex:9,carry:6},'마뫄':{value:80,flex:6,carry:6,uncertain:true},
- '큐베':{value:70,flex:5,carry:5},'엘리':{value:68,flex:7,carry:4},
- '설백':{value:63,flex:4,carry:3,call:5},'뀨냥냥':{value:54,flex:3,carry:2},
- '정령왕':{value:54,flex:3,carry:3,uncertain:true},'꼴랑이':{value:51,flex:2,carry:2},
+ '큐베':{value:70,flex:5,carry:5,uncertain:true},'엘리':{value:68,flex:7,carry:4},
+ '설백':{value:63,flex:4,carry:3,call:5},'뀨냥냥':{value:55,flex:3,carry:2,uncertain:true},
+ '정령왕':{value:54,flex:3,carry:3,uncertain:true},'꼴랑이':{value:51,flex:2,carry:2,uncertain:true},
  '양아지':{value:96,style:'hybrid',order:4,flex:9},
  '남봉':{value:86,style:'attack',order:10,flex:7},
- '인섹':{value:82,style:'attack',order:9,flex:5},
- '아야츠노 유니':{value:81,style:'hybrid',order:3,flex:8},
- '눈꽃':{value:80,style:'attack',order:6,flex:6},
- '임나은':{value:80,style:'attack',order:6,flex:6},
+ '인섹':{value:80,style:'attack',order:9,flex:5},
+ '아야츠노 유니':{value:82,style:'hybrid',order:3,flex:8},
+ '눈꽃':{value:84,style:'attack',order:6,flex:6},
+ '임나은':{value:78,style:'attack',order:6,flex:6},
  '삐부':{value:73,style:'base',order:3,flex:4},
  '서넹':{value:71,style:'base',order:4,flex:6},
  '담유이':{value:70,style:'base',order:2,flex:4},
@@ -40,7 +42,9 @@ function teamValue(picks,team){
  value+=damage.reduce((sum,p)=>sum+profile(p).flex*0.6+(profile(p).call||0),0);
  value+=support.reduce((sum,p)=>sum+profile(p).flex*0.5,0);
  const leadership=Math.max(0,...support.map(p=>profile(p).order||0));
- value+=leadership*12*(orderNeed[team]||0);
+ value+=leadership*6*(orderNeed[team]||0);
+ // Latest observations: CuVee's positioning is contested; avoid compounding tank instability.
+ if(['룩삼','콩콩'].includes(team)&&damage.some(p=>p.id==='큐베'))value-=5;
  if(support.length===2)value+=pairBonus(...support);
  if(team==='울프'&&support.some(p=>p.id==='임나은'))value+=12;
  if(damage.length===2){
@@ -74,6 +78,8 @@ function immediate(state,team,picks,p,scenario=0){
   if(!roster.length&&state.order.indexOf(team)<2)score+=10;
  }else if(p.role==='support'){
   if(!support)score+=8;
+  // Latest 04:18~04:35 discussions: early support-first can lose the damage pool.
+  if(!roster.length&&state.order.indexOf(team)<2)score-=28;
   if(scenario===2)score+=(profile(p).order||0)*(orderNeed[team]||0)*2;
   if(wolfSupportPlan(state,team,picks))score+=48;
  }
@@ -114,23 +120,35 @@ export function chooseDraftPlayer(state,team){
  const scored=legal.map(player=>{
   const forecasts=[0,1,2].map(scenario=>project(state,team,index,player,scenario));
   const scores=forecasts.map(f=>f.score);
-  return {player,score:Math.min(...scores)*0.65+scores.reduce((a,b)=>a+b,0)/scores.length*0.35+immediate(state,team,picked,player)*0.04};
+  return {player,score:(player.role==='damage'&&preferredWolfDamage.has(player.id)&&!rosterOf(picked,team).some(p=>p.role==='damage')?(state.order.indexOf(team)<2&&rosterOf(picked,team).length===0?42:12):0)+Math.min(...scores)*0.65+scores.reduce((a,b)=>a+b,0)/scores.length*0.35+immediate(state,team,picked,player)*0.12};
  }).sort((a,b)=>b.score-a.score||players.indexOf(a.player)-players.indexOf(b.player));
  const player=scored[0].player,roster=rosterOf(picked,team),reasons=[];
- if(player.role==='coach')reasons.push('선수 구성을 마친 뒤 남은 코치 선발');
- else{
-  reasons.push('스네이크 다음 차례와 최종 팀 조합을 예상해 선발');
+ const laterOwn=turns.some((t,i)=>i>index&&t===team&&!state.picks[i]);
+ const laterAny=turns.some((_,i)=>i>index&&!state.picks[i]);
+ if(legal.length===1){
+  reasons.push(`남은 미선발 후보 중 ${team} 팀의 역할 정원에 맞는 선수는 ${player.name} 한 명뿐`);
+ }else if(player.role==='coach'){
+  reasons.push('선수 네 명 선발 완료 · 코치 간 실력 비교 근거가 없어 남은 명단 순서로 선택');
+ }else{
+  if(!laterAny)reasons.push('전체 마지막 픽 · 현재 남은 후보와 역할 정원으로 결정');
+  else if(!laterOwn)reasons.push('이 팀의 마지막 픽 · 남은 후보로 현재 팀 구성 완성');
+  else reasons.push('남은 스네이크 차례를 3가지 선발 경향으로 예상해 최종 팀 평가 비교');
+  const rank=players.filter(p=>p.role===player.role).findIndex(p=>p.id===player.id)+1;
+  reasons.push(`사용자 지정 ${player.role==='damage'?'공격':'지원'} 기본 순위 ${rank}위`);
   if(player.role==='damage'){
-   if(preferredWolfDamage.has(player.id))reasons.push('초반 공격수 확보 가치 고려');
-   if(player.id==='설백')reasons.push('메이 활용과 전투 콜 보완');
-   if(roster.some(p=>p.role==='damage'))reasons.push('공격 역할과 영웅폭의 보완 관계 고려');
+   if(preferredWolfDamage.has(player.id))reasons.push('상위 공격수 소진 위험 고려');
+   if(player.id==='큐베'&&['룩삼','콩콩'].includes(team))reasons.push('최근 포지션 불안 의견을 반영해 조합 평가 감점');
+   if(player.id==='설백')reasons.push('메이·전투 콜 보완에 잠정 가점');
+   const partner=roster.find(p=>p.role==='damage');
+   if(partner)reasons.push(`${partner.name} / 공격 역할·영웅폭 보완 평가`);
   }else{
-   if(profile(player).order>=6&&orderNeed[team]>=1)reasons.push('팀장에게 필요한 오더·브리핑 보완');
-   if(team==='울프'&&player.id==='임나은')reasons.push('빠른 템포와 울프의 호흡 고려');
-   if(wolfSupportPlan(state,team,picked))reasons.push('선호 공격수 소진 후 지원 중심 전략 검토');
-   if(roster.some(p=>p.role==='support'))reasons.push('공격 기여와 본대 치유 역할 분담');
+   if(profile(player).order>=6&&orderNeed[team]>=1)reasons.push('팀장 오더·브리핑 보완 가점');
+   if(team==='울프'&&player.id==='임나은')reasons.push('울프와 빠른 템포 호흡에 잠정 가점');
+   if(wolfSupportPlan(state,team,picked))reasons.push('상위 공격수 소진 후 지원 중심 전략 비교');
+   const partner=roster.find(p=>p.role==='support');
+   if(partner)reasons.push(`${partner.name} / 지원 조합 평가 (${profile(partner).style==='base'?'본대 치유':profile(partner).style==='attack'?'공격 기여':'혼합 역할'} + ${profile(player).style==='base'?'본대 치유':profile(player).style==='attack'?'공격 기여':'혼합 역할'})`);
   }
-  if(profile(player).uncertain)reasons.push('관측이 부족한 선수는 잠정 평가 적용');
  }
+ if(profile(player).uncertain)reasons.push('최근 관측이 적거나 평가가 엇갈림 · 기본 순위를 유지한 잠정 평가');
  return {player,reason:reasons.join(' · '),policyVersion:POLICY_VERSION};
 }
