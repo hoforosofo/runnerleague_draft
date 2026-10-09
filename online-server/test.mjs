@@ -72,7 +72,7 @@ test('Community policy: conditional Wolf strategy, deterministic legal complete 
   }
   assert.equal(new Set(s.picks.map(p=>p.player)).size,count);
   for(const t of order){const roster=s.picks.filter(p=>p.team===t).map(p=>players.find(x=>x.id===p.player));assert.equal(roster.filter(p=>p.role==='damage').length,2);assert.equal(roster.filter(p=>p.role==='support').length,2);assert.equal(roster.filter(p=>p.role==='coach').length,coachMode?1:0)}
-  const removed=s.picks.pop();const finalChoice=chooseDraftPlayer(s,removed.team);assert.equal(finalChoice.player.id,removed.player);assert.match(finalChoice.reason,/한 명뿐|마지막 픽/);assert.doesNotMatch(finalChoice.reason,/남은 스네이크|다음 차례/);
+  const removed=s.picks.pop();const finalChoice=chooseDraftPlayer(s,removed.team);assert.equal(finalChoice.player.id,removed.player);assert.match(finalChoice.reason,/이 선수만|팀 구성을 완성/);assert.doesNotMatch(finalChoice.reason,/남은 스네이크|다음 차례/);
  }
  const custom=state();custom.turnOwners=Array.from({length:20},(_,i)=>teamAt(i,initialOrder));
  [custom.turnOwners[0],custom.turnOwners[1]]=[custom.turnOwners[1],custom.turnOwners[0]];
@@ -85,4 +85,9 @@ test('User ranking is shared and last team pick never claims a future turn',()=>
  assert.deepEqual(players.filter(p=>p.role==='support').map(p=>p.id),['양아지','남봉','눈꽃','아야츠노 유니','인섹','임나은','삐부','서넹','담유이','새담']);
  const s={order:initialOrder,picks:[],coachMode:false};
  for(let i=0;i<20;i++){const team=teamAt(i,s.order),c=chooseDraftPlayer(s,team);if(i>=15)assert.doesNotMatch(c.reason,/남은 스네이크|다음 차례/);s.picks.push({player:c.player.id,team})}
+});
+
+test('Reasons are one short sentence without rank labels',()=>{
+ const s={order:initialOrder,picks:[],coachMode:false};
+ for(let i=0;i<20;i++){const team=teamAt(i,s.order),c=chooseDraftPlayer(s,team);assert.ok(c.reason.length<65);assert.doesNotMatch(c.reason,/순위|[0-9]+위|사용자 지정| · /);s.picks.push({player:c.player.id,team})}
 });

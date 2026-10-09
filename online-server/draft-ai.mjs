@@ -4,7 +4,7 @@ import {players,eligible,teamAt} from './model.mjs';
 // Scores are policy weights, not measured skill, win rates, or trained parameters.
 export const EVIDENCE_AS_OF='2026-10-10T04:58:00+09:00';
 // Latest dated observations override older preferences; unobserved players retain user ranks.
-export const POLICY_VERSION='runnerleague-community-v3';
+export const POLICY_VERSION='runnerleague-community-v3.1';
 const profiles={
  '김뿡':{value:94,flex:8,carry:9},'뱅':{value:92,flex:6,carry:9},
  '디디디용':{value:83,flex:9,carry:6},'마뫄':{value:80,flex:6,carry:6,uncertain:true},
@@ -122,33 +122,17 @@ export function chooseDraftPlayer(state,team){
   const scores=forecasts.map(f=>f.score);
   return {player,score:(player.role==='damage'&&preferredWolfDamage.has(player.id)&&!rosterOf(picked,team).some(p=>p.role==='damage')?(state.order.indexOf(team)<2&&rosterOf(picked,team).length===0?42:12):0)+Math.min(...scores)*0.65+scores.reduce((a,b)=>a+b,0)/scores.length*0.35+immediate(state,team,picked,player)*0.12};
  }).sort((a,b)=>b.score-a.score||players.indexOf(a.player)-players.indexOf(b.player));
- const player=scored[0].player,roster=rosterOf(picked,team),reasons=[];
+ const player=scored[0].player,roster=rosterOf(picked,team);
  const laterOwn=turns.some((t,i)=>i>index&&t===team&&!state.picks[i]);
- const laterAny=turns.some((_,i)=>i>index&&!state.picks[i]);
- if(legal.length===1){
-  reasons.push(`남은 미선발 후보 중 ${team} 팀의 역할 정원에 맞는 선수는 ${player.name} 한 명뿐`);
- }else if(player.role==='coach'){
-  reasons.push('선수 네 명 선발 완료 · 코치 간 실력 비교 근거가 없어 남은 명단 순서로 선택');
- }else{
-  if(!laterAny)reasons.push('전체 마지막 픽 · 현재 남은 후보와 역할 정원으로 결정');
-  else if(!laterOwn)reasons.push('이 팀의 마지막 픽 · 남은 후보로 현재 팀 구성 완성');
-  else reasons.push('남은 스네이크 차례를 3가지 선발 경향으로 예상해 최종 팀 평가 비교');
-  const rank=players.filter(p=>p.role===player.role).findIndex(p=>p.id===player.id)+1;
-  reasons.push(`사용자 지정 ${player.role==='damage'?'공격':'지원'} 기본 순위 ${rank}위`);
-  if(player.role==='damage'){
-   if(preferredWolfDamage.has(player.id))reasons.push('상위 공격수 소진 위험 고려');
-   if(player.id==='큐베'&&['룩삼','콩콩'].includes(team))reasons.push('최근 포지션 불안 의견을 반영해 조합 평가 감점');
-   if(player.id==='설백')reasons.push('메이·전투 콜 보완에 잠정 가점');
-   const partner=roster.find(p=>p.role==='damage');
-   if(partner)reasons.push(`${partner.name} / 공격 역할·영웅폭 보완 평가`);
-  }else{
-   if(profile(player).order>=6&&orderNeed[team]>=1)reasons.push('팀장 오더·브리핑 보완 가점');
-   if(team==='울프'&&player.id==='임나은')reasons.push('울프와 빠른 템포 호흡에 잠정 가점');
-   if(wolfSupportPlan(state,team,picked))reasons.push('상위 공격수 소진 후 지원 중심 전략 비교');
-   const partner=roster.find(p=>p.role==='support');
-   if(partner)reasons.push(`${partner.name} / 지원 조합 평가 (${profile(partner).style==='base'?'본대 치유':profile(partner).style==='attack'?'공격 기여':'혼합 역할'} + ${profile(player).style==='base'?'본대 치유':profile(player).style==='attack'?'공격 기여':'혼합 역할'})`);
-  }
- }
- if(profile(player).uncertain)reasons.push('최근 관측이 적거나 평가가 엇갈림 · 기본 순위를 유지한 잠정 평가');
- return {player,reason:reasons.join(' · '),policyVersion:POLICY_VERSION};
+ let reason;
+ if(legal.length===1)reason='선택 가능한 선수가 이 선수만 남았습니다.';
+ else if(player.role==='coach')reason='선수 구성을 마쳐 남은 코치를 선택했습니다.';
+ else if(!laterOwn)reason='남은 후보 중 현재 팀 구성을 완성할 선수로 골랐습니다.';
+ else if(player.role==='support'&&wolfSupportPlan(state,team,picked))reason='공격수가 먼저 빠져 지원 중심 구성을 골랐습니다.';
+ else if(player.role==='support'&&profile(player).order>=6&&orderNeed[team]>=1)reason='팀의 오더를 보완하려고 골랐습니다.';
+ else if(player.role==='support'&&team==='울프'&&player.id==='임나은')reason='울프와의 호흡을 고려해 골랐습니다.';
+ else if(player.role==='support'&&roster.some(p=>p.role==='support'))reason='먼저 뽑은 지원 선수와의 조합을 고려했습니다.';
+ else if(player.role==='damage'&&preferredWolfDamage.has(player.id))reason='공격수를 먼저 확보하려고 골랐습니다.';
+ else reason='남은 후보 중 팀 조합이 더 낫다고 예상했습니다.';
+ return {player,reason,policyVersion:POLICY_VERSION};
 }
