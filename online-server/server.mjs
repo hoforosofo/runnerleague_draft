@@ -35,7 +35,7 @@ function command(r,m,action,data={}){
   if(!m.team&&waiting?.id!==m.id)throw Error('앞서 입장한 참가자가 먼저 팀을 선택해야 합니다.');
   if(r.members.some(p=>p.id!==m.id&&p.team===data.team))throw Error('이미 선택된 팀입니다.');m.team=data.team;m.spectator=false;botWaits.delete(r.code);if(initialOrder.every(t=>r.members.some(p=>p.team===t)))for(const p of r.members)if(!p.team)p.spectator=true;
  }else if(action==='spectate'){
-  requireHost(r,m);if(s.started||m.team)throw Error('준비 중에만 관전으로 변경할 수 있습니다.');m.spectator=true;
+  if(s.started&&m.team&&!s.autoPick)throw Error('자동 선발이 꺼져 있어 진행 중인 팀을 비울 수 없습니다.');m.team=null;m.spectator=true;botWaits.delete(r.code);
  }else if(action==='start'){
   requireHost(r,m);if(s.started)throw Error('이미 시작했습니다.');if(!s.autoPick&&initialOrder.some(t=>!r.members.some(p=>p.team===t)))throw Error('5개 팀의 팀장이 모두 선택되어야 합니다.');
   if(!s.autoPick&&r.members.some(p=>p.team&&!r.sockets.has(p.id)))throw Error('팀장이 모두 접속한 뒤 시작하세요.');s.started=true;
