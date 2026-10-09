@@ -165,3 +165,19 @@ main{height:calc(100dvh - 92px);padding:0 20px 18px;gap:16px;grid-template-colum
 @media(min-width:1000px) and (max-height:850px){#draft-preview{padding:18px}.preview-member{height:62px}.preview-member .avatar{width:38px;height:51px}.preview-empty{width:38px;height:48px}.preview-head h2{font-size:21px}.preview-progress{margin:12px 0}.preview-foot{margin-top:12px;padding-top:12px}}
 @media(max-width:999px){#draft-preview{width:calc(100vw - 24px);padding:16px}.preview-teams{grid-template-columns:repeat(2,minmax(0,1fr))}.preview-member{height:72px}.preview-foot{gap:10px}.saved-row{flex-wrap:wrap}.saved-actions{max-width:none}}
 @media(max-width:480px){.preview-teams{grid-template-columns:1fr}.preview-head h2{font-size:19px}.preview-foot{flex-direction:column;align-items:stretch}.preview-foot>div{justify-content:flex-end}}
+
+/* Online controls use the existing draft layout. */
+header{position:relative}.online-room-bar{position:absolute;left:50%;top:5px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;font-size:10px;color:#526b8e;background:#eef4ff;border:1px solid #d4e1f8;border-radius:8px;padding:4px 8px;max-width:46%;white-space:nowrap;z-index:3}.online-room-bar strong{font-size:10px}.online-room-bar .secondary{font-size:9px;padding:3px 5px}.online-room-bar span{overflow:hidden;text-overflow:ellipsis}
+#online-menu,#online-lobby{max-width:620px}#online-menu label{display:block;font-size:12px;font-weight:650;margin:12px 0}#online-menu input{display:block;width:100%;padding:9px 10px;border:1px solid #d7e2ef;border-radius:7px;background:#fff;color:#17243b;margin-top:6px}#online-menu details{font-size:12px}#online-status{font-size:12px;color:#2463eb}.online-menu-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.online-members{margin:14px 0;display:flex;flex-direction:column;gap:7px}.online-member{display:flex;align-items:center;gap:8px;border:1px solid #e4eaf3;border-radius:7px;padding:9px;font-size:12px}.online-member>span{color:#7b889d;margin-left:auto;font-size:11px}.online-team-options{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:14px 0}.online-team-options button{padding:5px}.online-team-options img{width:100%;height:80px;object-fit:contain}.online-team-options strong{display:block;font-size:11px;margin-top:5px}.online-team-options button:disabled{opacity:.35}#online-lobby p{font-size:12px}.online-room-bar~*{max-width:100%}
+@media(max-width:1100px){.online-room-bar{top:48px;max-width:90%;width:max-content}.online-room-bar span{display:none}#online-lobby{max-height:90dvh;overflow:auto}}
+
+body:has(#toast.show) .online-room-bar{visibility:hidden}
+#online-lobby{max-height:90dvh;overflow:auto}
+
+/* Coach participation is optional; keep the selection panel dimensions. */
+#coach-mode{font:inherit;color:#17243b;background:#fff;border:1px solid #d8e2ef;border-radius:5px;padding:2px 6px;max-width:95px}#coach-mode:focus-visible{outline:2px solid #2463eb;outline-offset:2px}
+.no-coaches .slots{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(min-width:1100px){.no-coaches #pool{grid-template-rows:18px minmax(0,1fr) 18px minmax(0,1fr)}.no-coaches #pool:has(>.player-grid:last-child:nth-child(2)){grid-template-rows:18px minmax(0,1fr)}}
+.no-coaches .result-roster{grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,2fr)}
+.no-coaches #results.vertical-view .result-roster{grid-template-columns:1fr;grid-template-rows:repeat(5,minmax(0,1fr))}
+@media(max-width:700px){.no-coaches .result-roster{grid-template-columns:1fr;grid-template-rows:repeat(3,140px)}}

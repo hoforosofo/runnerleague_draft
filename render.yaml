@@ -1,0 +1,16 @@
+# Optional Render Blueprint for a trial server.
+# Free instances lose rooms when restarted or redeployed.
+services:
+  - type: web
+    name: runnerleague-online
+    runtime: node
+    plan: free
+    rootDir: online-server
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: ALLOWED_ORIGINS
+        value: https://hoforosofo.github.io
