@@ -5,7 +5,8 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {WebSocket} from 'ws';
-import {players,initialOrder,eligible} from './model.mjs';
+import {players,initialOrder,eligible,teamAt} from './model.mjs';
+import {chooseDraftPlayer,POLICY_VERSION} from './draft-ai.mjs';
 const origin='http://127.0.0.1:8766',port=8791,base=`http://127.0.0.1:${port}`;
 const dir=mkdtempSync(path.join(tmpdir(),'runnerleague-test-'));
 let processServer;
@@ -39,4 +40,42 @@ test('Custom order, blank name, absent teams, reconnect grace and offline pause'
  await until(()=>host.room.state.picks.filter(Boolean).length===20);assert.equal(host.room.state.picks.filter(p=>p.automatic).length,19);for(const t of order){const roster=host.room.state.picks.filter(p=>p.team===t);assert.equal(roster.filter(p=>players.find(x=>x.id===p.player).role==='damage').length,2);assert.equal(roster.filter(p=>players.find(x=>x.id===p.player).role==='support').length,2)}good(await host.cmd('confirm'));
  const pausedToken=await post('/rooms',{}),paused=await client(pausedToken);clients.push(paused);good(await paused.cmd('spectate'));good(await paused.cmd('start'));paused.ws.close();await delay(1200);const resume=await client(pausedToken);clients.push(resume);assert.equal(resume.room.state.picks.filter(Boolean).length,0);
  }finally{for(const c of clients)c.ws.terminate();await stop();rmSync(dir,{recursive:true,force:true})}
+});
+
+test('Community policy: conditional Wolf strategy, deterministic legal complete drafts',()=>{
+ const state=(picks=[],order=initialOrder,coachMode=false)=>({picks,order,coachMode});
+ const wolfOrder=['둥그레','룩삼','콩콩','푸린','울프'];
+ const prefix=ids=>ids.map((player,i)=>({player,team:wolfOrder[i]}));
+ const available=state(prefix(['양아지','남봉','인섹','눈꽃']),wolfOrder);
+ const before=JSON.stringify(available),first=chooseDraftPlayer(available,'울프');
+ assert.equal(first.player.role,'damage');
+ assert.ok(['김뿡','뱅','디디디용'].includes(first.player.id));
+ assert.equal(JSON.stringify(available),before);
+ assert.deepEqual(chooseDraftPlayer(available,'울프'),first);
+ available.picks.push({player:first.player.id,team:'울프'});
+ assert.equal(chooseDraftPlayer(available,'울프').player.role,'support');
+ const depleted=state(prefix(['김뿡','뱅','디디디용','마뫄']),wolfOrder);
+ const a=chooseDraftPlayer(depleted,'울프');assert.equal(a.player.role,'support');
+ assert.match(a.reason,/지원 중심/);
+ depleted.picks.push({player:a.player.id,team:'울프'});
+ assert.equal(chooseDraftPlayer(depleted,'울프').player.role,'support');
+ // A remaining base healer must remain legal alongside Nam-bong.
+ const pairing=state([{player:'남봉',team:'둥그레'},{player:'김뿡',team:'둥그레'},{player:'뱅',team:'둥그레'},...players.filter(p=>p.role==='support'&&!['남봉','담유이'].includes(p.id)).map(p=>({player:p.id,team:'룩삼'}))]);
+ assert.equal(chooseDraftPlayer(pairing,'둥그레').player.id,'담유이');
+ for(const coachMode of [false,true])for(const order of [initialOrder,wolfOrder,[...initialOrder].reverse()]){
+  const s=state([],order,coachMode),count=coachMode?25:20;
+  for(let i=0;i<count;i++){
+   const t=teamAt(i,order),choice=chooseDraftPlayer(s,t);assert.ok(choice);
+   assert.ok(eligible(choice.player,t,s.picks,coachMode));assert.ok(choice.reason);assert.equal(choice.policyVersion,POLICY_VERSION);
+   if(choice.player.role==='coach')assert.equal(s.picks.filter(p=>p.team===t).length,4);
+   s.picks.push({player:choice.player.id,team:t});
+  }
+  assert.equal(new Set(s.picks.map(p=>p.player)).size,count);
+  for(const t of order){const roster=s.picks.filter(p=>p.team===t).map(p=>players.find(x=>x.id===p.player));assert.equal(roster.filter(p=>p.role==='damage').length,2);assert.equal(roster.filter(p=>p.role==='support').length,2);assert.equal(roster.filter(p=>p.role==='coach').length,coachMode?1:0)}
+  const removed=s.picks.pop();assert.equal(chooseDraftPlayer(s,removed.team).player.id,removed.player);
+ }
+ const custom=state();custom.turnOwners=Array.from({length:20},(_,i)=>teamAt(i,initialOrder));
+ [custom.turnOwners[0],custom.turnOwners[1]]=[custom.turnOwners[1],custom.turnOwners[0]];
+ assert.ok(chooseDraftPlayer(custom,custom.turnOwners[0]));
+ assert.equal(chooseDraftPlayer(state(),'없는 팀'),null);
 });

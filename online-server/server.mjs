@@ -4,13 +4,14 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {WebSocketServer,WebSocket} from 'ws';
 import {players,initialOrder,caps,eligible} from './model.mjs';
+import {chooseDraftPlayer} from './draft-ai.mjs';
 const byId=id=>players.find(p=>p.id===id);
 const allowedOrigins=new Set((process.env.ALLOWED_ORIGINS||'https://hoforosofo.github.io,http://127.0.0.1:8766,http://localhost:8766').split(',').map(v=>v.trim()));
 const storage=process.env.DATA_DIR?path.join(process.env.DATA_DIR,'rooms.json'):null;
 const rooms=new Map();
 const botWaits=new Map();
 const reconnectGrace=Number(process.env.RECONNECT_GRACE_MS)||30000;
-const vacantDelay=Number(process.env.AUTO_PICK_DELAY_MS)||3000;
+const vacantDelay=0; // AI-only teams pick without an artificial delay.
 if(storage){fs.mkdirSync(path.dirname(storage),{recursive:true});if(fs.existsSync(storage)){for(const r of JSON.parse(fs.readFileSync(storage,'utf8'))){r.sockets=new Map();rooms.set(r.code,r)}}}
 function persist(){if(!storage)return;const data=[...rooms.values()].map(({sockets,...r})=>r);fs.writeFileSync(storage+'.tmp',JSON.stringify(data));fs.renameSync(storage+'.tmp',storage)}
 const sha=value=>crypto.createHash('sha256').update(value).digest('hex');
@@ -90,21 +91,13 @@ wss.on('connection',ws=>{let room=null,me=null;const timer=setTimeout(()=>ws.clo
  if(msg.type!=='command')return;if(msg.revision!==room.revision){ws.send(JSON.stringify({type:'error',requestId,message:'화면이 갱신되었습니다. 다시 시도해 주세요.'}));emit(room);return}command(room,me,msg.action,msg.data);ws.send(JSON.stringify({type:'ack',requestId}));
  }catch(e){ws.send(JSON.stringify({type:'error',requestId,message:e.message}));}});ws.on('close',()=>{clearTimeout(timer);if(room&&room.sockets.get(me.id)===ws){room.sockets.delete(me.id);emit(room)}});ws.on('pong',()=>{ws.isAlive=true});ws.isAlive=true});
 
-// No external AI API: respect roster capacities and balance role counts.
-function automaticChoice(r,team){
- const picked=selected(r),options=players.filter(p=>eligible(p,team,picked,r.state.coachMode));
- const roleCount=role=>picked.filter(p=>p.team===team&&byId(p.player).role===role).length;
- const least=Math.min(...options.map(p=>roleCount(p.role)/caps[p.role]));
- const balanced=options.filter(p=>roleCount(p.role)/caps[p.role]===least);
- return balanced.length?balanced[crypto.randomInt(balanced.length)]:null;
-}
-setInterval(()=>{for(const r of rooms.values()){
- if(!r.state.started||r.state.resultsConfirmed||!r.state.autoPick||!r.sockets.size){botWaits.delete(r.code);continue}
+setInterval(()=>{for(const r of rooms.values())for(let step=0;step<25;step++){
+ if(!r.state.started||r.state.resultsConfirmed||!r.state.autoPick||!r.sockets.size){botWaits.delete(r.code);break}
  const index=nextIndex(r),team=r.state.turnOwners[index],owner=r.members.find(m=>m.team===team);
- if(index<0||owner&&r.sockets.has(owner.id)){botWaits.delete(r.code);continue}
+ if(index<0||owner&&r.sockets.has(owner.id)){botWaits.delete(r.code);break}
  let wait=botWaits.get(r.code);if(!wait||wait.index!==index){wait={index,until:Date.now()+(owner?reconnectGrace:vacantDelay)};botWaits.set(r.code,wait)}
- if(Date.now()<wait.until)continue;const player=automaticChoice(r,team);if(player){r.state.picks[index]={player:player.id,team,automatic:true};commit(r)}
-}},500).unref();
+ if(Date.now()<wait.until)break;const decision=chooseDraftPlayer(r.state,team);if(decision){r.state.picks[index]={player:decision.player.id,team,automatic:true,autoReason:decision.reason,autoPolicy:decision.policyVersion};commit(r)}else break;
+}},50).unref();
 
 const heartbeat=setInterval(()=>{for(const ws of wss.clients){if(!ws.isAlive){ws.terminate();continue}ws.isAlive=false;ws.ping()}},30000);heartbeat.unref();
 setInterval(()=>{const cutoff=Date.now()-7*86400000;for(const [code,r] of rooms)if(!r.sockets.size&&r.updatedAt<cutoff)rooms.delete(code);for(const [ip,v] of rates)if(Date.now()-v.at>60000)rates.delete(ip);persist()},3600000).unref();
