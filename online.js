@@ -10,17 +10,32 @@ const recover=code=>JSON.parse(sessionStorage.getItem(sessionKey(code))||localSt
 const mine=()=>room?.members.find(m=>m.id===credentials?.memberId);
 const isHost=()=>mine()?.id===room?.hostId;
 let serverOffset=0,matchmakingBusy=false,previousLocalState=null,readState=()=>null;
+let showCode=localStorage.getItem('runnerleague.show-code')==='true';
+window.addEventListener('pagehide',()=>{
+ if(!credentials||socket?.readyState!==WebSocket.OPEN)return;
+ const {code,token}=credentials;
+ navigator.sendBeacon(endpoint().replace(/\/$/,'')+`/rooms/${code}/leave`,JSON.stringify({token}));
+ sessionStorage.removeItem(sessionKey(code));localStorage.removeItem(recoveryKey(code));sessionStorage.removeItem('runnerleague.active-room');localStorage.removeItem('runnerleague.active-room');
+ credentials=null;clearTimeout(retry);socket.close(1000,'site-left');
+});
 async function startMatch(){if(room){openLobby();return}if(matchmakingBusy)return;const button=$('#open-random-match');try{matchmakingBusy=true;previousLocalState=readState();matchRanking=[...initialOrder];button.disabled=true;await enter(false,'',null,true)}catch(e){matchmakingBusy=false;previousLocalState=null;notify(e.message)}finally{button.disabled=false}}
 
-function updateTimer(){const timer=$('#online-turn-timer');if(timer)timer.textContent=room?.state.turnTimer?`선택 ${Math.max(0,Math.ceil((room.state.turnTimer.deadline-Date.now()-serverOffset)/1000))}초`:''}
-setInterval(updateTimer,200);
+function updateTimer(){
+ const banner=$('#turn-banner'),state=room?.state;
+ const active=state?.started&&!state.resultsConfirmed&&state.turnTimer&&state.picks.filter(Boolean).length<(state.coachMode?25:20);
+ let timer=$('#online-turn-timer');if(!active){timer?.remove();return}
+ if(!timer){timer=el('div',undefined,'draft-countdown');timer.id='online-turn-timer';timer.setAttribute('aria-label','선택 시간');banner?.append(timer);}
+ const seconds=Math.max(0,(state.turnTimer.deadline-Date.now()-serverOffset)/1000);
+ timer.textContent=seconds<10?seconds.toFixed(1)+'초':Math.ceil(seconds)+'초';timer.classList.toggle('urgent',seconds<10);
+}
+setInterval(updateTimer,100);
 function refreshChrome(){
- $('#online-room-bar')?.remove();if(!room)return;
- const bar=el('div',undefined,'online-room-bar');bar.id='online-room-bar';
+ $('#online-room-bar')?.remove();$('#online-room-status')?.remove();$('#online-code-toggle')?.remove();$('#online-room-controls')?.remove();if(!room){updateTimer();return;}
+ const heading=$('.board-panel>.section-heading'),bar=el('span',undefined,'room-status');bar.id='online-room-status';
  const stateText=!connected?'연결 중…':!room.state.started?'팀장 선택 대기':room.state.resultsConfirmed?'팀 구성 확정':'드래프트 진행 중';
- bar.append(el('strong',room.state.matchmaking&&!room.state.started?`랜덤매칭 · ${room.members.filter(m=>m.connected).length} / 5명`:`방 ${room.code} · ${stateText}`),el('span',`${mine()?.name||''} · ${mine()?.team||'관전'}${isHost()?' · 방장':''}`));
- const lobby=el('button',room.state.matchmaking&&!room.state.started?'매칭 현황':'참가자 / 초대','secondary');lobby.onclick=openLobby;bar.append(lobby);document.querySelector('header').append(bar);
- const timer=el('strong');timer.id='online-turn-timer';bar.append(timer);updateTimer();
+ bar.textContent=!connected?'재연결 중':room.state.matchmaking&&!room.state.started?'매칭 접속 중':'방 접속 중';bar.title=`${stateText} · ${mine()?.team||'관전'}`;heading?.querySelector('h2').after(bar);const toggle=el('button',showCode?`코드 ${room.code} · 숨기기`:'코드 보기','secondary');toggle.id='online-code-toggle';toggle.setAttribute('aria-pressed',String(showCode));toggle.onclick=()=>{showCode=!showCode;localStorage.setItem('runnerleague.show-code',String(showCode));refreshChrome();if($('#online-lobby')?.open)openLobby()};heading?.append(toggle);
+ const lobby=el('button',room.state.matchmaking&&!room.state.started?'매칭 현황':'참가자 / 초대','secondary');lobby.onclick=openLobby;lobby.id='online-room-controls';heading?.append(lobby);
+ updateTimer();
  if(!room.state.started&&(room.state.matchmaking||!mine()?.team&&!mine()?.spectator))openLobby();
 }
 function action(name,data={}){
@@ -73,7 +88,7 @@ function menu(mode='join'){
  renderCreationOrder();$('#online-server-url').value=endpoint();$('#online-code').value=new URL(location.href).searchParams.get('room')||'';$('#online-status').textContent=endpoint()?'':'온라인 기능은 별도 서버 배포 후 사용할 수 있습니다.';$('#online-server-settings').open=!endpoint();dialog.showModal();
 }
 function openLobby(){
- if(!room)return;let dialog=$('#online-lobby');if(!dialog){dialog=el('dialog');dialog.id='online-lobby';document.body.append(dialog)}dialog.replaceChildren();dialog.append(el('h2',`온라인 방 · ${room.code}`));
+ if(!room)return;let dialog=$('#online-lobby');if(!dialog){dialog=el('dialog');dialog.id='online-lobby';document.body.append(dialog)}dialog.replaceChildren();dialog.append(el('h2',showCode?`온라인 방 · ${room.code}`:'온라인 방'));
  const matching=room.state.matchmaking&&!room.state.started;
  if(matching&&room.state.matchPhase!=='waiting'){renderMatchStage(dialog);if(!dialog.open)dialog.showModal();return;}
  if(matching){dialog.querySelector('h2').textContent=`랜덤매칭 대기 · ${room.members.filter(m=>m.connected).length} / 5명`;const hint=el('p','5명이 모이면 팀장을 무작위로 배정하고 순위 투표를 진행합니다.');const cancel=el('button','매칭 취소','secondary');cancel.id='cancel-match';cancel.onclick=()=>{const code=credentials?.code;credentials=null;clearTimeout(retry);socket?.close();socket=null;connected=false;pending=false;matchmakingBusy=false;room=null;sessionStorage.removeItem('runnerleague.active-room');localStorage.removeItem('runnerleague.active-room');if(code){sessionStorage.removeItem(sessionKey(code));localStorage.removeItem(recoveryKey(code))}const url=new URL(location.href);url.searchParams.delete('room');history.replaceState(null,'',url);dialog.close();refreshChrome();if(previousLocalState)apply(previousLocalState);previousLocalState=null;$('#online-menu')?.close()};dialog.append(hint,cancel);if(!dialog.open)dialog.showModal();return;}
@@ -82,7 +97,7 @@ function openLobby(){
  const members=el('div',undefined,'online-members');for(const m of room.members){const row=el('div',undefined,'online-member');row.append(el('strong',`${m.name}${m.id===room.hostId?' · 방장':''}`),el('span',`${m.team||(m.spectator?'관전':'미선택')} · ${m.connected?'접속 중':room.state.autoPick?'연결 끊김 · 자동 선발 대기':'연결 끊김'}`));if(isHost()&&!room.state.started&&m.id!==me.id){const release=el('button','자리 비우기','text-btn');release.onclick=()=>action('release',{memberId:m.id});row.append(release)}members.append(row)}if(room.state.autoPick)for(const team of room.state.order)if(!room.members.some(m=>m.team===team)){const row=el('div',undefined,'online-member');row.append(el('strong',`${team} 팀`),el('span','팀장 없음 · 자동 선발'));members.append(row)}dialog.append(members);
  const teams=el('div',undefined,'online-team-options');for(const [index,team] of room.state.order.entries()){const button=el('button',undefined,'secondary');const img=el('img');img.src=players.find(p=>p.id===team).image;img.alt=team;button.append(el('small',`${index+1}번`),img,el('strong',team));button.disabled=room.members.some(m=>m.team===team);button.dataset.onlineTeam=team;button.setAttribute('aria-pressed',String(me?.team===team));button.onclick=()=>action('claim',{team});teams.append(button)}dialog.append(teams);
  if(!me?.spectator){const spectator=el('button','관전으로 전환','secondary');spectator.id='online-spectate';spectator.onclick=()=>action('spectate');dialog.append(spectator)}
- const actions=el('div',undefined,'dialog-actions');const leave=el('button','방 나가기','secondary');leave.onclick=()=>{if(!confirm('방에서 나갈까요? 기존 방은 방 코드로 다시 접속할 수 있습니다.'))return;const previous=credentials;credentials=null;clearTimeout(retry);socket?.close();sessionStorage.removeItem('runnerleague.active-room');localStorage.removeItem('runnerleague.active-room');localStorage.setItem('runnerleague.mode','solo');const url=new URL(location.href);url.searchParams.delete('room');location.replace(url.href)};actions.append(leave);const close=el('button','화면 보기','secondary');close.onclick=()=>dialog.close();actions.append(close);if(isHost()&&!room.state.started){const start=el('button','드래프트 시작','primary');start.id='online-start';start.disabled=!room.state.autoPick&&initialOrder.some(t=>!room.members.some(m=>m.team===t&&m.connected));start.onclick=()=>{dialog.close();action('start')};actions.append(start)}dialog.append(actions);if(!dialog.open)dialog.showModal();
+ const actions=el('div',undefined,'dialog-actions');const leave=el('button','방 나가기','secondary');leave.onclick=()=>{if(!confirm('방에서 나갈까요? 팀장 자리가 비워집니다.'))return;const previous=credentials;if(previous){navigator.sendBeacon(endpoint().replace(/\/$/,'')+`/rooms/${previous.code}/leave`,JSON.stringify({token:previous.token}));sessionStorage.removeItem(sessionKey(previous.code));localStorage.removeItem(recoveryKey(previous.code));socket?.close(1000,'site-left')}credentials=null;clearTimeout(retry);socket?.close();sessionStorage.removeItem('runnerleague.active-room');localStorage.removeItem('runnerleague.active-room');localStorage.setItem('runnerleague.mode','solo');const url=new URL(location.href);url.searchParams.delete('room');location.replace(url.href)};actions.append(leave);const close=el('button','화면 보기','secondary');close.onclick=()=>dialog.close();actions.append(close);if(isHost()&&!room.state.started){const start=el('button','드래프트 시작','primary');start.id='online-start';start.disabled=!room.state.autoPick&&initialOrder.some(t=>!room.members.some(m=>m.team===t&&m.connected));start.onclick=()=>{dialog.close();action('start')};actions.append(start)}dialog.append(actions);if(!dialog.open)dialog.showModal();
 }
 function renderMatchStage(dialog){
  const s=room.state,me=mine();dialog.querySelector('h2').textContent=s.matchPhase==='voting'?'팀장 순위 투표':'픽 자리 선택';
