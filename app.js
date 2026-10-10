@@ -46,8 +46,7 @@ function renderPool(){const active=current(),available=players.filter(p=>p.role!
  document.querySelectorAll('[data-role]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.role===filter)));
 }
 function renderBoard(){const active=current(),done=started&&!active;$('#undo').disabled=chosen().length===0;$('#turn-banner').innerHTML=!started?'<span class="turn-number">—</span><div><strong>드래프트 준비</strong><small>팀장 순서는 언제든 바꿀 수 있습니다.</small></div>':done?`<span class="turn-number">✓</span><div><strong>드래프트 완료</strong><small>5개 팀의 구성이 완성되었습니다.</small></div><span class="turn-badge">COMPLETE</span>`:`${avatar(byId(active))}<div><strong>${active} 팀의 선택</strong><small>${Math.floor(nextIndex()/5)+1}라운드 · 전체 ${nextIndex()+1}번째 선발</small></div><span class="turn-badge">NOW PICKING</span>`;$('#progress').style.width=`${chosen().length/total()*100}%`;
- let html=order.map((team,col)=>{let cells='';for(let round=0;round<total()/5;round++){const idx=turnOwners.map((owner,i)=>owner===team?i:-1).filter(i=>i>=0)[round],entry=picks[idx],p=entry?byId(entry.player):null,isCurrent=idx===nextIndex();cells+=`<div class="draft-cell ${p?'filled':''} ${isCurrent?'current':''}" data-pick-index="${idx}" title="${entry?.automatic?entry.autoReason||'자동 선발':''}" aria-label="${idx+1}번째, ${team} 팀${p?', '+p.name:isCurrent?', 현재 차례':''}"><span class="pick-number">${idx+1}</span>${p?`${`<button class="selected-player" data-remove-player="${p.id}" aria-label="${p.name} 선발 취소" title="${p.name} · 클릭하여 선발 취소">${avatar(p)}</button>`}<strong>${p.name}${p.name==='미정'?'<small class="undecided">출전 미정</small>':''}</strong><span class="role-mini">${displayRole(p)}${entry.automatic?' · AI':''}</span>${entry.automatic?`<button class="ai-pick-badge" data-ai-reason="${idx}" aria-label="${p.name} AI 선발 이유">AI · 이유</button>`:''}`:isCurrent?'<small>선수 선택</small>':''}</div>`}return `<div class="draft-team-row ${active===team?'active':''}" style="--rounds:${total()/5}"><div class="board-captain">${avatar(byId(tanks[team]))}<strong>${team}</strong><small>${col+1}팀</small></div>${cells}</div>`}).join('');$('#board').innerHTML=html;
- document.querySelectorAll('[data-ai-reason]').forEach(button=>{button.draggable=false;button.onclick=e=>{e.stopPropagation();const entry=picks[Number(button.dataset.aiReason)];if(!entry)return;let dialog=$('#ai-reason-dialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='ai-reason-dialog';document.body.append(dialog)}dialog.replaceChildren();const heading=document.createElement('h2'),reason=document.createElement('p'),close=document.createElement('button');heading.textContent=`${entry.team} 팀 · ${byId(entry.player).name}`;reason.textContent=entry.autoReason||'이 선발에는 저장된 이유가 없습니다.';close.textContent='닫기';close.className='primary';close.onclick=()=>dialog.close();dialog.append(heading,reason,close);dialog.showModal()}});
+ let html=order.map((team,col)=>{let cells='';for(let round=0;round<total()/5;round++){const idx=turnOwners.map((owner,i)=>owner===team?i:-1).filter(i=>i>=0)[round],entry=picks[idx],p=entry?byId(entry.player):null,isCurrent=idx===nextIndex();cells+=`<div class="draft-cell ${p?'filled':''} ${isCurrent?'current':''}" data-pick-index="${idx}" title="${entry?.automatic?'자동 선발':''}" aria-label="${idx+1}번째, ${team} 팀${p?', '+p.name:isCurrent?', 현재 차례':''}"><span class="pick-number">${idx+1}</span>${p?`${`<button class="selected-player" data-remove-player="${p.id}" aria-label="${p.name} 선발 취소" title="${p.name} · 클릭하여 선발 취소">${avatar(p)}</button>`}<strong>${p.name}${p.name==='미정'?'<small class="undecided">출전 미정</small>':''}</strong><span class="role-mini">${displayRole(p)}${entry.automatic?' · AI':''}</span>${entry.automatic?'<span class="ai-pick-badge">AI</span>':''}`:isCurrent?'<small>선수 선택</small>':''}</div>`}return `<div class="draft-team-row ${active===team?'active':''}" style="--rounds:${total()/5}"><div class="board-captain">${avatar(byId(tanks[team]))}<strong>${team}</strong><small>${col+1}팀</small></div>${cells}</div>`}).join('');$('#board').innerHTML=html;
 
  document.querySelectorAll('[data-pick-index]').forEach(cell=>{
  const index=Number(cell.dataset.pickIndex);cell.draggable=!!picks[index];
@@ -80,7 +79,7 @@ function renderResults(){
  screen.hidden=!(complete&&resultsConfirmed);document.body.classList.toggle('show-results',complete&&resultsConfirmed);
  if(!complete||!resultsConfirmed)return;
  screen.classList.toggle('vertical-view',resultView==='vertical');
- screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>선발이 완료되었습니다. 돌격 카드를 드래그하거나 클릭해 다른 팀의 탱커와 교환할 수 있습니다.</p></div><div class="results-actions"><button class="secondary" id="save-result-draft">임시저장</button><button class="secondary" id="load-result-draft">불러오기</button><div class="view-switch" aria-label="팀 구성 보기"><button class="secondary" data-view="horizontal" aria-pressed="${resultView==='horizontal'}">가로 보기</button><button class="secondary" data-view="vertical" aria-pressed="${resultView==='vertical'}">세로 보기</button></div><button class="primary" id="save-results">결과 이미지 저장</button><button class="secondary" id="edit-draft">수정하기</button><button class="primary" id="restart-draft">드래프트 다시하기</button></div></div><div class="results-grid">${order.map((team,i)=>{
+ screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>선발이 완료되었습니다. 돌격 카드를 드래그하거나 클릭해 다른 팀의 탱커와 교환할 수 있습니다.</p></div><div class="results-actions"><button class="secondary" id="save-result-draft">임시저장</button><button class="secondary" id="load-result-draft">불러오기</button><div class="view-switch" aria-label="팀 구성 보기"><button class="secondary" data-view="horizontal" aria-pressed="${resultView==='horizontal'}">가로 보기</button><button class="secondary" data-view="vertical" aria-pressed="${resultView==='vertical'}">세로 보기</button></div><button class="primary" id="save-results">결과 이미지 저장</button><button class="secondary" id="save-snake-results">드래프트 순서 이미지 저장</button><button class="secondary" id="edit-draft">수정하기</button><button class="primary" id="restart-draft">드래프트 다시하기</button></div></div><div class="results-grid">${order.map((team,i)=>{
  const roster=chosen().filter(p=>p.team===team).map(p=>byId(p.player));
 
  return `<article class="result-team" style="--team-color:${colors[i]}" aria-label="${tanks[team]} 팀"><div class="result-team-title"><small>TEAM ${String(i+1).padStart(2,'0')}</small><h2>${tanks[team]} 팀</h2></div><div class="result-roster">${(coachMode?['tank','damage','support','coach']:['tank','damage','support']).map(role=>{const list=role==='tank'?[byId(tanks[team])]:sortRoster(roster.filter(p=>p.role===role));return `<div class="result-role"><span>${roles[role]}</span><div>${list.map(p=>role==='tank'?`<div class="result-member"><button class="result-portrait result-tank" draggable="true" data-edit-tank="${team}" aria-label="${p.name} 탱커 교체" title="탱커 교체">${avatar(p)}</button><span class="result-member-meta"><strong>${p.name}</strong><small>${roles[p.role]}</small></span></div>`:`<div class="result-member"><div class="result-portrait">${avatar(p)}</div><span class="result-member-meta"><strong>${p.name}</strong><small>${roles[p.role]}</small></span></div>`).join('')}</div></div>`}).join('')}</div></article>`
@@ -93,9 +92,35 @@ function renderResults(){
  b.ondrop=e=>{e.preventDefault();const source=e.dataTransfer.getData('application/x-result-tank'),target=b.dataset.editTank;if(source===target||!order.includes(source))return;if(online.action('tankSwap',{from:source,to:target}))return;[tanks[source],tanks[target]]=[tanks[target],tanks[source]];render()};
  });
  $('#save-result-draft').onclick=saveDraft;$('#load-result-draft').onclick=openSavedDrafts;
- $('#save-results').onclick=downloadResultsImage;
+ $('#save-results').onclick=downloadResultsImage;$('#save-snake-results').onclick=downloadSnakeImage;
  $('#edit-draft').onclick=()=>{if(online.action('edit'))return;resultsConfirmed=false;completionPrompted=true;render();window.scrollTo(0,0)};
  $('#restart-draft').onclick=()=>{reset(true);window.scrollTo(0,0)};
+}
+async function downloadSnakeImage(){
+ const button=$('#save-snake-results');if(button.disabled)return;button.disabled=true;button.textContent='저장 중…';
+ try{
+  await document.fonts.ready;
+  const canvas=document.createElement('canvas');canvas.width=1600;canvas.height=960;
+  const ctx=canvas.getContext('2d');ctx.fillStyle='#f3f6fb';ctx.fillRect(0,0,1600,960);
+  const text=(value,x,y,size=18,color='#17243b')=>{ctx.font=`650 ${size}px League, sans-serif`;ctx.fillStyle=color;ctx.fillText(value,x,y)};
+  const portrait=async(p,x,y,w,h)=>{if(!p)return;const img=new Image();img.src=p.image;await img.decode();const scale=Math.min(w/img.naturalWidth,h/img.naturalHeight);ctx.drawImage(img,x+(w-img.naturalWidth*scale)/2,y+(h-img.naturalHeight*scale)/2,img.naturalWidth*scale,img.naturalHeight*scale)};
+  text('RUNNER LEAGUE / SNAKE DRAFT',32,36,16,'#2463eb');text('스네이크 드래프트 · 선발 순서',32,82,32);
+  const rounds=total()/5,cellWidth=1308/rounds;
+  for(let round=0;round<rounds;round++)text(`${round+1}라운드`,230+round*cellWidth,122,17,'#7b889d');
+  for(const [i,team] of order.entries()){
+   const y=145+i*155;ctx.fillStyle='#fff';ctx.beginPath();ctx.roundRect(32,y,1536,144,12);ctx.fill();
+   text(`${i+1} · ${team} 팀`,48,y+23,17);await portrait(byId(team),62,y+33,110,102);
+   const indices=turnOwners.map((owner,index)=>owner===team?index:-1).filter(index=>index>=0);
+   for(const [round,index] of indices.entries()){
+    const x=218+round*cellWidth,entry=picks[index];
+    ctx.strokeStyle='#dce5f2';ctx.strokeRect(x,y+8,cellWidth-14,128);
+    text(`${String(index+1).padStart(2,'0')}번`,x+10,y+29,17,'#2463eb');
+    if(entry)await portrait(byId(entry.player),x+8,y+35,cellWidth-30,95);else text('미선발',x+30,y+85,16,'#7b889d');
+   }
+  }
+  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('PNG 생성 실패');
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='runnerleague_snake_draft.png';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+ }catch(error){toast('드래프트 순서 이미지 저장에 실패했습니다.');console.error(error)}finally{button.disabled=false;button.textContent='드래프트 순서 이미지 저장'}
 }
 async function downloadResultsImage(){
  const button=$('#save-results');if(!resultsConfirmed||button.disabled)return;button.disabled=true;button.textContent='저장 중…';

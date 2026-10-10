@@ -1,5 +1,7 @@
 .touch-drag-ghost{position:fixed!important;transform:translate(-50%,-50%);pointer-events:none!important;z-index:100;opacity:.85;background:#fff;border-radius:8px;box-shadow:0 8px 28px #17243b40}
 .touch-drag-source{opacity:.4}.touch-drop-target{outline:2px solid #2463eb;outline-offset:2px}
+.ai-pick-badge{pointer-events:none;cursor:default}
+#online-menu #create-random-matching{width:14px;margin:0}
 @media(pointer:coarse){[draggable=true]{-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}button,a,select{touch-action:manipulation}}
 @media(max-width:700px){
  body{overflow-x:clip}header{height:auto;min-height:64px;padding:10px 12px;flex-wrap:wrap;gap:8px;margin-bottom:10px}

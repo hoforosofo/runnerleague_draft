@@ -5,7 +5,7 @@ export {EVIDENCE_AS_OF} from './draft-evidence.mjs';
 // Provisional judgments from the supplied 2026-10-08~10 community export.
 // Scores are policy weights, not measured skill, win rates, or trained parameters.
 // Latest dated observations override older preferences; unobserved players retain user ranks.
-export const POLICY_VERSION='runnerleague-community-v5';
+export const POLICY_VERSION='runnerleague-community-v6';
 const profiles={
  '김뿡':{value:94,flex:8,carry:9},'뱅':{value:92,flex:6,carry:9},
  '디디디용':{value:88,flex:9,carry:6},'마뫄':{value:85,flex:6,carry:6,uncertain:true},
@@ -48,11 +48,10 @@ function teamValue(picks,team){
  value+=Math.min(20,leadership*2*(orderNeed[team]||0));
 
  if(support.length===2)value+=pairBonus(...support);
- if(team==='울프'&&support.some(p=>p.id==='임나은'))value+=12;
  if(damage.length===2){
   // Two development-heavy damage slots remain risky even with strong supports.
   const weak=damage.filter(p=>profile(p).value<64).length;
-  if(weak===2)value-=team==='울프'?18:32;
+  if(weak===2)value-=32;
   if(damage.some(p=>p.id==='설백')&&damage.some(p=>profile(p).carry>=6))value+=3;
   const strongest=Math.max(...damage.map(p=>profile(p).carry));
   value+=strongest*1.5;
@@ -63,13 +62,6 @@ function candidates(state,team,picks){
  const legal=players.filter(p=>eligible(p,team,picks,state.coachMode));
  const playerSlots=legal.filter(p=>p.role!=='coach');
  return playerSlots.length?playerSlots:legal;
-}
-function wolfSupportPlan(state,team,picks){
- const roster=rosterOf(picks,team);
- return team==='울프'&&state.order.indexOf(team)===4&&
-  !roster.some(p=>p.role==='damage')&&roster.filter(p=>p.role==='support').length<2&&
-  !players.some(p=>preferredWolfDamage.has(p.id)&&eligible(p,team,picks,state.coachMode))&&
-  !players.some(p=>p.id==='마뫄'&&eligible(p,team,picks,state.coachMode));
 }
 function immediate(state,team,picks,p,scenario=0){
  const roster=rosterOf(picks,team),damage=roster.filter(p=>p.role==='damage').length,support=roster.filter(p=>p.role==='support').length;
@@ -83,7 +75,6 @@ function immediate(state,team,picks,p,scenario=0){
   // Latest 04:18~04:35 discussions: early support-first can lose the damage pool.
   if(!roster.length&&state.order.indexOf(team)<2)score-=8;
   if(scenario===2)score+=(profile(p).order||0)*(orderNeed[team]||0)*2;
-  if(wolfSupportPlan(state,team,picks))score+=48;
  }
  return score;
 }
@@ -119,6 +110,15 @@ export function chooseDraftPlayer(state,team){
  let index=firstEmpty;
  if(turns[index]!==team)index=turns.findIndex((t,i)=>i>=Math.max(0,firstEmpty)&&t===team&&!state.picks[i]);
  if(index<0)return null;
+ // Opening preferences apply only to a team's first selection in round one.
+ const ownRoster=rosterOf(picked,team);
+ if(index<5&&!ownRoster.length){
+  const priority=['양아지','김뿡','뱅','남봉'];
+  if(picked.some(p=>p.player==='양아지'))priority.unshift('남봉');
+  if(picked.some(p=>p.player==='김뿡'))priority.unshift('뱅');
+  const opener=priority.map(id=>legal.find(p=>p.id===id)).find(Boolean);
+  if(opener)return {player:opener,policyVersion:POLICY_VERSION};
+ }
  const scored=legal.map(player=>{
   const forecasts=[0,1,2].map(scenario=>project(state,team,index,player,scenario));
   const scores=forecasts.map(f=>f.score);
@@ -126,17 +126,5 @@ export function chooseDraftPlayer(state,team){
   const healerPriorityAdjustment=player.role==='damage'&&profile(player).value<=64&&strongerHealerAvailable?24:0;
   return {player,score:(player.role==='damage'&&preferredWolfDamage.has(player.id)&&!rosterOf(picked,team).some(p=>p.role==='damage')?12:0)+Math.min(...scores)*0.65+scores.reduce((a,b)=>a+b,0)/scores.length*0.35+immediate(state,team,picked,player)*0.12-healerPriorityAdjustment};
  }).sort((a,b)=>b.score-a.score||players.indexOf(a.player)-players.indexOf(b.player));
- const player=scored[0].player,roster=rosterOf(picked,team);
- const laterOwn=turns.some((t,i)=>i>index&&t===team&&!state.picks[i]);
- let reason;
- if(legal.length===1)reason='선택 가능한 선수가 이 선수만 남았습니다.';
- else if(player.role==='coach')reason='선수 구성을 마쳐 남은 코치를 선택했습니다.';
- else if(!laterOwn)reason='남은 후보 중 현재 팀 구성을 완성할 선수로 골랐습니다.';
- else if(player.role==='support'&&wolfSupportPlan(state,team,picked))reason='딜러가 먼저 빠져 힐러 중심 구성을 골랐습니다.';
- else if(player.role==='support'&&profile(player).order>=6&&orderNeed[team]>=1)reason='팀의 오더를 보완하려고 골랐습니다.';
- else if(player.role==='support'&&team==='울프'&&player.id==='임나은')reason='울프와의 호흡을 고려해 골랐습니다.';
- else if(player.role==='support'&&roster.some(p=>p.role==='support'))reason='먼저 뽑은 힐러와의 조합을 고려했습니다.';
- else if(player.role==='damage'&&preferredWolfDamage.has(player.id))reason='딜러를 먼저 확보하려고 골랐습니다.';
- else reason='남은 후보 중 팀 조합이 더 낫다고 예상했습니다.';
- return {player,reason,policyVersion:POLICY_VERSION};
+ return {player:scored[0].player,policyVersion:POLICY_VERSION};
 }
