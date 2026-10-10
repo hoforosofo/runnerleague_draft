@@ -1,0 +1,23 @@
+.button-icon{width:18px;height:18px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+button.has-icon{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.primary,.secondary{min-height:38px;padding:8px 12px;font-size:13px;font-weight:700;line-height:1.35;border-radius:9px}
+.text-btn{min-height:36px;padding:6px 9px}.tools .secondary{font-size:12px;padding:7px 10px}
+.header-right{gap:14px}.connection-tools,.draft-save-tools{display:flex;align-items:center;gap:7px}.header-right>.tag,.header-right>.desktop{display:none}
+.connection-tools{padding-right:14px;border-right:1px solid #e0e7f1}.draft-save-tools .secondary{font-size:13px;padding:8px 12px;min-height:40px}
+.connection-tools button{min-height:42px;white-space:nowrap}.connection-tools .primary{box-shadow:0 3px 10px #2463eb20}
+.captain .avatar{height:70px}.setup-bottom{gap:8px}.setup-action{display:flex;align-items:center;gap:8px}
+.results-actions button{font-size:13px;padding:9px 13px;min-height:42px}.online-menu-actions button{font-size:14px;min-height:44px;padding:10px 14px}
+dialog .primary,dialog .secondary{min-height:42px;font-size:13px}.saved-actions{max-width:310px}
+#online-menu #match-captain{display:block;width:100%;font:inherit;font-size:15px;padding:11px;border:1px solid #d7e2ef;border-radius:8px;margin-top:8px;background:#fff;color:#17243b}
+.online-room-bar{position:static;transform:none;max-width:100%;flex-basis:100%;justify-content:center;order:3;width:100%;padding:6px 10px;white-space:normal}.online-room-bar .secondary{min-height:32px;padding:5px 8px;font-size:11px}
+header:has(.online-room-bar){height:auto;min-height:76px;flex-wrap:wrap;padding-top:10px;padding-bottom:8px;gap:8px}
+@media(min-width:1100px){body:has(.online-room-bar) main{height:calc(100dvh - 132px)}}
+@media(max-width:1099px) and (min-width:701px){header:has(.online-room-bar){margin-bottom:12px}.brand{font-size:14px}.header-right{gap:7px}.connection-tools{gap:5px;padding-right:7px}.connection-tools button,.draft-save-tools .secondary{font-size:12px;padding:8px}.button-icon{width:16px;height:16px}}
+@media(max-width:700px){
+ header{padding:12px;gap:12px}.brand{font-size:15px}.header-right{width:100%;display:flex;flex-wrap:wrap;gap:8px;margin:0}
+ .connection-tools{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:0;border:0;order:0}
+ .connection-tools button{display:flex;flex-direction:column;gap:5px;padding:10px 4px;min-height:64px;font-size:13px}.connection-tools .button-icon{width:21px;height:21px}
+ .draft-save-tools{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;order:1}.draft-save-tools .secondary{min-height:42px;font-size:13px;padding:9px 12px}
+ .primary,.secondary,.tools .secondary{min-height:42px;font-size:13px;padding:8px 11px}.captain .avatar{height:82px}
+ .results-actions button{font-size:12px;padding:9px 8px}.results-actions .button-icon{width:17px;height:17px}.saved-actions{max-width:none}
+}
