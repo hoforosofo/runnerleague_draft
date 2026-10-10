@@ -48,13 +48,13 @@ test('Custom order, blank name, absent teams, reconnect grace and offline pause'
  const clients=[];try{await start();
  const invalid=await fetch(base+'/rooms',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({order:Array(5).fill(initialOrder[0])})});assert.equal(invalid.status,400);
  const matchTokens=[],matchClients=[];
- for(let i=0;i<4;i++){const c=await post('/matchmaking',{name:'매칭'+i});matchTokens.push(c);const peer=await client(c);clients.push(peer);matchClients.push(peer);assert.equal(peer.room.state.started,false);assert.ok(peer.room.members.every(m=>m.team===null));}
+ for(let i=0;i<4;i++){const c=await post('/matchmaking',{name:'매칭'+i,team:initialOrder[i]});matchTokens.push(c);const peer=await client(c);clients.push(peer);matchClients.push(peer);assert.equal(peer.room.state.started,false);assert.ok(peer.room.members.every(m=>initialOrder.includes(m.team)));}
  assert.equal(new Set(matchTokens.map(c=>c.code)).size,1);
  denied(await matchClients[0].cmd('start'));denied(await matchClients[0].cmd('claim',{team:initialOrder[0]}));
- const fifth=await post('/matchmaking',{name:'매칭4'});assert.equal(fifth.code,matchTokens[0].code);const fifthClient=await client(fifth);clients.push(fifthClient);await until(()=>matchClients[0].room.state.started);
+ const fifth=await post('/matchmaking',{name:'매칭4',team:initialOrder[4]});assert.equal(fifth.code,matchTokens[0].code);const fifthClient=await client(fifth);clients.push(fifthClient);await until(()=>matchClients[0].room.state.matchPhase==='voting');matchClients.push(fifthClient);for(const c of matchClients)good(await c.cmd('matchVote',{ranking:initialOrder}));assert.deepEqual(fifthClient.room.state.choiceOrder,[...initialOrder].reverse());assert.equal(fifthClient.room.state.matchScores[initialOrder[0]],25);denied(await matchClients[0].cmd('matchPosition',{position:0}));for(const [i,team] of [...initialOrder].reverse().entries())good(await matchClients[initialOrder.indexOf(team)].cmd('matchPosition',{position:i}));await until(()=>matchClients[0].room.state.started&&fifthClient.room.state.started);assert.deepEqual(fifthClient.room.state.order,[...initialOrder].reverse());
  assert.equal(new Set(fifthClient.room.members.map(m=>m.team)).size,5);assert.ok(fifthClient.room.members.every(m=>m.connected));
- const nextMatch=await post('/matchmaking',{});assert.notEqual(nextMatch.code,fifth.code);const cancelled=await client(nextMatch);clients.push(cancelled);cancelled.ws.close();await delay(100);
- const replacement=await post('/matchmaking',{});const replacementClient=await client(replacement);clients.push(replacementClient);assert.equal(replacementClient.room.members.length,1);
+ const nextMatch=await post('/matchmaking',{team:initialOrder[0]});assert.notEqual(nextMatch.code,fifth.code);const cancelled=await client(nextMatch);clients.push(cancelled);cancelled.ws.close();await delay(100);
+ const replacement=await post('/matchmaking',{team:initialOrder[0]});const replacementClient=await client(replacement);clients.push(replacementClient);assert.equal(replacementClient.room.members.length,1);
  const randomOwner=await post('/rooms',{randomMatching:true,autoPick:false}),randomHost=await client(randomOwner);clients.push(randomHost);
  assert.equal(randomHost.room.state.randomMatching,true);assert.ok(initialOrder.includes(randomHost.room.members[0].team));
  for(let i=0;i<5;i++){const c=await post(`/rooms/${randomOwner.code}/join`,{});clients.push(await client(c));}
