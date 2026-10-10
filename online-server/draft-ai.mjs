@@ -1,10 +1,11 @@
 import {players,eligible,teamAt} from './model.mjs';
+import {adjustment} from './draft-evidence.mjs';
+export {EVIDENCE_AS_OF} from './draft-evidence.mjs';
 
 // Provisional judgments from the supplied 2026-10-08~10 community export.
 // Scores are policy weights, not measured skill, win rates, or trained parameters.
-export const EVIDENCE_AS_OF='2026-10-10T05:16:00+09:00';
 // Latest dated observations override older preferences; unobserved players retain user ranks.
-export const POLICY_VERSION='runnerleague-community-v4.1';
+export const POLICY_VERSION='runnerleague-community-v5';
 const profiles={
  '김뿡':{value:94,flex:8,carry:9},'뱅':{value:92,flex:6,carry:9},
  '디디디용':{value:88,flex:9,carry:6},'마뫄':{value:85,flex:6,carry:6,uncertain:true},
@@ -22,7 +23,8 @@ const profiles={
  '담유이':{value:70,style:'base',order:2,flex:4},
  '새담':{value:67,style:'base',order:3,flex:4},
 };
-const orderNeed={'둥그레':1,'룩삼':1.25,'울프':0.15,'콩콩':1.2,'푸린':0.35};
+for(const [id,p] of Object.entries(profiles))p.value+=adjustment(id);
+const orderNeed={'둥그레':1+adjustment('둥그레 오더 의존'),'룩삼':1.25,'울프':0.15,'콩콩':1.2,'푸린':0.35};
 const preferredWolfDamage=new Set(['김뿡','뱅','디디디용']);
 const byId=new Map(players.map(p=>[p.id,p]));
 const rosterOf=(picks,team)=>picks.filter(p=>p.team===team).map(p=>byId.get(p.player)).filter(Boolean);
@@ -34,6 +36,7 @@ function pairBonus(a,b){
   x.style!==y.style?14:x.style==='attack'?-8:-6;
  // Nam-bong can lead an aggressive plan while a partner sustains the main group.
  if((a.id==='남봉'&&y.style==='base')||(b.id==='남봉'&&x.style==='base'))score+=12;
+ if([a.id,b.id].includes('양아지')&&[a.id,b.id].includes('아야츠노 유니'))score+=adjustment('양아지+유니');
  return score;
 }
 function teamValue(picks,team){
