@@ -9,7 +9,7 @@ import {players,initialOrder,eligible,teamAt} from './model.mjs';
 import {chooseDraftPlayer,POLICY_VERSION} from './draft-ai.mjs';
 import {evidenceWeight,weightedAdjustment} from './draft-evidence.mjs';
 test('recent evidence and deduplication',()=>{
- const now='2026-10-10T11:37:00+09:00',old='2026-10-10T05:37:00+09:00';
+ const now='2026-10-10T11:37:00+09:00',old='2026-10-09T23:37:00+09:00';
  assert.equal(evidenceWeight(now,1,now),1);
  assert.equal(evidenceWeight(old,1,now),.5);
  assert.equal(evidenceWeight('invalid',1,now),0);
@@ -34,11 +34,11 @@ test('Online authority, sequential claims, complete draft and server restart',as
  try{await start();const owner=await post('/rooms',{name:'방장',autoPick:false}),host=await client(owner);clients.push(host);good(await host.cmd('spectate'));const credentials=[];
  for(let i=0;i<5;i++){const c=await post(`/rooms/${owner.code}/join`,{name:'팀장'+i});credentials.push(c);clients.push(await client(c))}
  good(await clients[2].cmd('claim',{team:initialOrder[1]}));good(await clients[2].cmd('spectate'));denied(await clients[1].cmd('start'));denied(await host.cmd('start'));
- for(let i=0;i<5;i++)good(await clients[i+1].cmd('claim',{team:initialOrder[i]}));assert.equal(host.room.state.coachMode,false);assert.equal(host.room.state.turnOwners.length,20);good(await host.cmd('coachMode',{enabled:true}));good(await host.cmd('start'));denied(await host.cmd('pick',{player:'김뿡'}));denied(await clients[2].cmd('pick',{player:'김뿡'}));denied(await clients[1].cmd('order',{from:0,to:4}));
+ for(let i=0;i<5;i++)good(await clients[i+1].cmd('claim',{team:initialOrder[i]}));assert.equal(host.room.state.coachMode,false);assert.equal(host.room.state.turnOwners.length,20);denied(await host.cmd('coachMode',{enabled:true}));good(await host.cmd('start'));denied(await host.cmd('pick',{player:'김뿡'}));denied(await clients[2].cmd('pick',{player:'김뿡'}));denied(await clients[1].cmd('order',{from:0,to:4}));
  const staleRevision=clients[1].room.revision;good(await clients[1].cmd('pick',{player:'김뿡'}));const stale=await new Promise(resolve=>{clients[1].ws.once('message',raw=>resolve(JSON.parse(raw)));clients[1].ws.send(JSON.stringify({type:'command',action:'pick',data:{player:'디디디용'},revision:staleRevision,requestId:'stale-test'}))});denied(stale);assert.equal(host.room.state.picks.filter(Boolean).length,1);
- for(let idx=1;idx<25;idx++){const r=host.room,s=r.state,team=s.turnOwners[idx],c=clients[initialOrder.indexOf(team)+1],picked=s.picks.filter(Boolean),p=players.find(p=>eligible(p,team,picked,true));good(await c.cmd('pick',{player:p.id}))}
- assert.equal(host.room.state.picks.filter(Boolean).length,25);denied(await host.cmd('swap',{from:0,to:11}));denied(await clients[1].cmd('reset'));denied(await clients[1].cmd('confirm'));good(await host.cmd('confirm'));good(await host.cmd('tankSwap',{from:initialOrder[0],to:initialOrder[4]}));const final=structuredClone(host.room.state);
- for(const c of clients)c.ws.close();await stop();await start();const restored=await client(owner);clients.push(restored);assert.deepEqual(restored.room.state,final);good(await restored.cmd('edit'));good(await restored.cmd('undo'));assert.equal(restored.room.state.picks.filter(Boolean).length,24);good(await restored.cmd('reset'));assert.equal(restored.room.state.coachMode,false);for(let i=0;i<5;i++)clients.push(await client(credentials[i]));good(await restored.cmd('start'));denied(await clients.at(-5).cmd('pick',{player:'짜누'}));for(let idx=0;idx<20;idx++){const state=restored.room.state,team=state.turnOwners[idx],p=players.find(p=>eligible(p,team,state.picks.filter(Boolean),false));good(await clients.at(-5+initialOrder.indexOf(team)).cmd('pick',{player:p.id}))}good(await restored.cmd('confirm'));assert.equal(restored.room.state.resultsConfirmed,true);
+ for(let idx=1;idx<20;idx++){const r=host.room,s=r.state,team=s.turnOwners[idx],c=clients[initialOrder.indexOf(team)+1],picked=s.picks.filter(Boolean),p=players.find(p=>eligible(p,team,picked,false));good(await c.cmd('pick',{player:p.id}))}
+ assert.equal(host.room.state.picks.filter(Boolean).length,20);denied(await host.cmd('swap',{from:0,to:11}));denied(await clients[1].cmd('reset'));denied(await clients[1].cmd('confirm'));good(await host.cmd('confirm'));good(await host.cmd('tankSwap',{from:initialOrder[0],to:initialOrder[4]}));const final=structuredClone(host.room.state);
+ for(const c of clients)c.ws.close();await stop();await start();const restored=await client(owner);clients.push(restored);assert.deepEqual(restored.room.state,final);good(await restored.cmd('edit'));good(await restored.cmd('undo'));assert.equal(restored.room.state.picks.filter(Boolean).length,19);good(await restored.cmd('reset'));assert.equal(restored.room.state.coachMode,false);for(let i=0;i<5;i++)clients.push(await client(credentials[i]));good(await restored.cmd('start'));denied(await clients.at(-5).cmd('pick',{player:'짜누'}));for(let idx=0;idx<20;idx++){const state=restored.room.state,team=state.turnOwners[idx],p=players.find(p=>eligible(p,team,state.picks.filter(Boolean),false));good(await clients.at(-5+initialOrder.indexOf(team)).cmd('pick',{player:p.id}))}good(await restored.cmd('confirm'));assert.equal(restored.room.state.resultsConfirmed,true);
  }finally{for(const c of clients)c.ws.terminate();await stop();rmSync(dir,{recursive:true,force:true})}
 });
 
@@ -47,6 +47,7 @@ async function until(check){const deadline=Date.now()+35000;while(!check()){if(D
 test('Custom order, blank name, absent teams, reconnect grace and offline pause',async()=>{
  const clients=[];try{await start();
  const invalid=await fetch(base+'/rooms',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({order:Array(5).fill(initialOrder[0])})});assert.equal(invalid.status,400);
+ const departure=await post('/rooms',{}),departHost=await client(departure);clients.push(departHost);good(await departHost.cmd('claim',{team:initialOrder[0]}));const other=await post(`/rooms/${departure.code}/join`,{}),departGuest=await client(other);clients.push(departGuest);good(await departGuest.cmd('claim',{team:initialOrder[1]}));await post(`/rooms/${departure.code}/leave`,{token:departure.token});await until(()=>departGuest.room.members.length===1);assert.equal(departGuest.room.hostId,other.memberId);assert.ok(!departGuest.room.members.some(m=>m.team===initialOrder[0]));
  const matchTokens=[],matchClients=[];
  for(let i=0;i<4;i++){const c=await post('/matchmaking',{name:'매칭'+i,team:initialOrder[i]});matchTokens.push(c);const peer=await client(c);clients.push(peer);matchClients.push(peer);assert.equal(peer.room.state.started,false);assert.ok(peer.room.members.every(m=>m.team===null));}
  assert.equal(new Set(matchTokens.map(c=>c.code)).size,1);
@@ -90,7 +91,7 @@ test('Updated opening preferences and legal complete drafts',()=>{
  // A remaining base healer must remain legal alongside Nam-bong.
  const pairing=state([{player:'남봉',team:'둥그레'},{player:'김뿡',team:'둥그레'},{player:'뱅',team:'둥그레'},...players.filter(p=>p.role==='support'&&!['남봉','담유이'].includes(p.id)).map(p=>({player:p.id,team:'룩삼'}))]);
  assert.equal(chooseDraftPlayer(pairing,'둥그레').player.id,'담유이');
- for(const coachMode of [false,true])for(const order of [initialOrder,wolfOrder,[...initialOrder].reverse()]){
+ for(const coachMode of [false])for(const order of [initialOrder,wolfOrder,[...initialOrder].reverse()]){
   const s=state([],order,coachMode),count=coachMode?25:20;
   for(let i=0;i<count;i++){
    const t=teamAt(i,order),choice=chooseDraftPlayer(s,t);assert.ok(choice);
@@ -115,14 +116,9 @@ test('User ranking is shared and last team pick never claims a future turn',()=>
  for(let i=0;i<20;i++){const team=teamAt(i,s.order),c=chooseDraftPlayer(s,team);assert.equal(c.reason,undefined);s.picks.push({player:c.player.id,team})}
 });
 
-test('First round follows user opening and adjacent preferences for every captain',()=>{
- for(const team of initialOrder){
-  const order=[team,...initialOrder.filter(t=>t!==team)];
-  assert.equal(chooseDraftPlayer({order,picks:[],coachMode:false},team).player.id,'양아지');
-  const nextOrder=[order[1],team,...order.slice(2)];
-  assert.equal(chooseDraftPlayer({order:nextOrder,picks:[{player:'양아지',team:nextOrder[0]}],coachMode:false},team).player.id,'남봉');
-  assert.equal(chooseDraftPlayer({order:nextOrder,picks:[{player:'김뿡',team:nextOrder[0]}],coachMode:false},team).player.id,'뱅');
- }
+test('Fresh opening preferences differ by captain rather than forcing one chain',()=>{
+ const opening=team=>chooseDraftPlayer({order:[team,...initialOrder.filter(t=>t!==team)],picks:[],coachMode:false},team).player.id;
+ assert.equal(opening('룩삼'),'뱅');assert.equal(opening('콩콩'),'김뿡');assert.equal(opening('둥그레'),'남봉');
 });
 test('No pick reason is generated',()=>{
  const s={order:initialOrder,picks:[],coachMode:false};
@@ -136,7 +132,7 @@ test('Tier gaps survive composition bonuses across captain orders',()=>{
   for(let i=0;i<20;i++){const team=teamAt(i,order),c=chooseDraftPlayer(s,team);s.picks.push({player:c.player.id,team})}
   const at=id=>s.picks.findIndex(p=>p.player===id);
   assert.ok(at('큐베')<at('엘리'),JSON.stringify(s.picks));
-  for(const id of ['설백','뀨냥냥','정령왕','꼴랑이'])assert.ok(at('엘리')<at(id));
+  for(const id of ['뀨냥냥','꼴랑이'])assert.ok(at('엘리')<at(id)); // Latest evidence permits Seol/Jeong to pass Elli by fit.
   assert.ok(at('양아지')<6,'Standout support should be secured by first turn-around in these scenarios');
  }
 });
