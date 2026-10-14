@@ -6,3 +6,6 @@ export const players=Object.entries(groups).flatMap(([role,names])=>names.map(na
 export const initialOrder=['룩삼','콩콩','둥그레','푸린','울프'];
 export function teamAt(index,order){const round=Math.floor(index/order.length);return order[round%2?order.length-1-index%order.length:index%order.length];}
 export function eligible(player,team,picks,coachMode){return player.role!=='tank'&&player.role!=='coach'&&!picks.some(p=>p.player===player.id)&&picks.filter(p=>p.team===team&&players.find(x=>x.id===p.player)?.role===player.role).length<caps[player.role];}
+
+// Shared by room admission and the connected-member counter.
+export const ROOM_CAPACITY=50;
