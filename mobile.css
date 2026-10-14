@@ -11,7 +11,7 @@
  .panel,.team-section{padding:12px;border-radius:12px}.setup{min-height:0;gap:10px}.setup-bottom{flex-wrap:wrap;gap:8px}.setup-action{margin-left:auto}
  .section-heading{flex-wrap:wrap;gap:6px}.section-heading h2{font-size:14px}
  .captains{gap:5px}.captain .avatar{height:82px}.arrows{position:static;gap:2px}.arrows button{min-width:28px;min-height:32px;line-height:28px;padding:0 3px}
- .setup #order-help{font-size:10px}.setup #order-help::after{content:' · 길게 눌러 교환'}
+ .setup #order-help{font-size:10px}.setup #order-help::after{content:none}
  .primary,.secondary,.text-btn{min-height:40px;padding:8px 10px;font-size:12px}.tabs button{min-height:40px;font-size:12px}
  .pool-panel{order:1;padding-bottom:12px}.board-panel{order:2;height:auto;min-height:0}.team-section{order:3}
  #pool{display:block}.player-grid{gap:8px 5px;padding:0}.player .avatar{height:clamp(82px,25vw,110px);width:100%;object-fit:contain}.role-heading{margin:12px 0 7px!important}

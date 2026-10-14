@@ -1,5 +1,5 @@
 import {ONLINE_SERVER_URL} from './online-config.js';
-import {initialOrder,players} from './model.mjs?v=custom-time-1';
+import {initialOrder,players} from './model.mjs?v=mobile-fast-1';
 const $=s=>document.querySelector(s);
 const el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node};
 let room=null,credentials=null,socket=null,connected=false,apply=()=>{},notify=()=>{},pending=false,retry=null,readOrder=()=>[...initialOrder];
@@ -9,6 +9,11 @@ const recoveryKey=code=>`${sessionKey(code)}.${endpoint()}`;
 const recover=code=>JSON.parse(sessionStorage.getItem(sessionKey(code))||localStorage.getItem(recoveryKey(code))||'null');
 const mine=()=>room?.members.find(m=>m.id===credentials?.memberId);
 const isHost=()=>mine()?.id===room?.hostId;
+let warmingAt=0;
+function warmServer(){const base=endpoint().replace(/\/$/,'');if(!base||Date.now()-warmingAt<30000)return;warmingAt=Date.now();fetch(base+'/health',{cache:'no-store',signal:AbortSignal.timeout(70000)}).catch(()=>{})}
+let connectionNoticeTimer;
+function connecting(stage){let dialog=$('#online-connecting');if(!dialog){dialog=el('dialog');dialog.id='online-connecting';dialog.innerHTML='<div class="connection-progress"><span class="connection-spinner" aria-hidden="true"></span><span role="status" id="connection-stage"></span></div><p id="connection-hint">서버 응답을 기다리고 있습니다.</p>';document.body.append(dialog)}$('#connection-stage').textContent=stage;$('#connection-hint').textContent='서버 응답을 기다리고 있습니다.';if(!dialog.open)dialog.showModal();clearTimeout(connectionNoticeTimer);connectionNoticeTimer=setTimeout(()=>{if(dialog.open)$('#connection-hint').textContent='서버 시작이나 네트워크 연결에 시간이 걸리고 있습니다. 잠시 기다려 주세요.'},8000)}
+function connectedNotice(){clearTimeout(connectionNoticeTimer);$('#online-connecting')?.close()}
 let serverOffset=0,matchmakingBusy=false,previousLocalState=null,readState=()=>null;
 let showCode=localStorage.getItem('runnerleague.show-code')==='true';
 window.addEventListener('pagehide',()=>{
@@ -48,14 +53,17 @@ function connect(){
  clearTimeout(retry);connected=false;const url=new URL(endpoint());url.protocol=url.protocol==='https:'?'wss:':'ws:';url.pathname='/ws';url.search='';socket=new WebSocket(url);
  const peer=socket;
  socket.onopen=()=>{if(socket!==peer||!credentials)return;socket.send(JSON.stringify({type:'auth',code:credentials.code,token:credentials.token}));};
- socket.onmessage=e=>{if(socket!==peer)return;const msg=JSON.parse(e.data);if(msg.type==='state'){const wasStarted=!!room?.state.started;room=msg.room;serverOffset=(room.serverTime||Date.now())-Date.now();connected=true;pending=false;matchmakingBusy=false;apply(room.state);refreshChrome();if(room.state.started&&!wasStarted){$('#online-lobby')?.close()}else if($('#online-lobby')?.open)openLobby()}else if(msg.type==='error'){pending=false;if(msg.message==='재접속 정보가 유효하지 않습니다.'){localStorage.removeItem(recoveryKey(credentials.code));sessionStorage.removeItem(sessionKey(credentials.code));localStorage.removeItem('runnerleague.active-room');sessionStorage.removeItem('runnerleague.active-room');credentials=null;socket.close();room=null;menu()}notify(msg.message);const info=$('#online-status');if(info)info.textContent=msg.message}};
+ socket.onmessage=e=>{if(socket!==peer)return;const msg=JSON.parse(e.data);if(msg.type==='state'){connectedNotice();const wasStarted=!!room?.state.started;room=msg.room;serverOffset=(room.serverTime||Date.now())-Date.now();connected=true;pending=false;matchmakingBusy=false;apply(room.state);refreshChrome();if(room.state.started&&!wasStarted){$('#online-lobby')?.close()}else if($('#online-lobby')?.open)openLobby()}else if(msg.type==='error'){pending=false;if(msg.message==='재접속 정보가 유효하지 않습니다.'){localStorage.removeItem(recoveryKey(credentials.code));sessionStorage.removeItem(sessionKey(credentials.code));localStorage.removeItem('runnerleague.active-room');sessionStorage.removeItem('runnerleague.active-room');credentials=null;socket.close();room=null;menu()}notify(msg.message);const info=$('#online-status');if(info)info.textContent=msg.message}};
  socket.onclose=e=>{if(socket!==peer)return;connected=false;pending=false;refreshChrome();if(e.code===4001){notify('다른 탭에서 같은 참가자로 접속했습니다.');return}if(credentials)retry=setTimeout(connect,1500)};
 }
 async function enter(create,name,code,matchmaking=false){
+ try{
  const base=endpoint().replace(/\/$/,'');if(!base)throw Error('먼저 온라인 서버 주소를 설정하세요.');
  const saved=code?recover(code):null;
- const response=await fetch(base+(matchmaking?'/matchmaking':create?'/rooms':`/rooms/${code}/join`),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name||(create?'방장':'참가자'),token:saved?.token,...(create&&!matchmaking?{order:[...creationOrder],autoPick:$('#create-auto-pick').checked,turnLimitSeconds:readTurnLimit('create')}:{})})});const data=await response.json();if(!response.ok)throw Error(data.error||'방에 접속하지 못했습니다.');credentials=data;sessionStorage.setItem(sessionKey(data.code),JSON.stringify(data));sessionStorage.setItem('runnerleague.active-room',data.code);localStorage.setItem(recoveryKey(data.code),JSON.stringify(data));localStorage.setItem('runnerleague.active-room',data.code);
- const link=new URL(location.href);link.searchParams.set('room',data.code);history.replaceState(null,'',link);$('#online-menu')?.close();connect();
+ connecting(matchmaking?'랜덤매칭에 접속 중…':create?'온라인 방을 만들고 있습니다…':'온라인 방에 접속 중…');
+ const response=await fetch(base+(matchmaking?'/matchmaking':create?'/rooms':`/rooms/${code}/join`),{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({name:name||(create?'방장':'참가자'),token:saved?.token,...(create&&!matchmaking?{order:[...creationOrder],autoPick:$('#create-auto-pick').checked,turnLimitSeconds:readTurnLimit('create')}:{})})});const data=await response.json();if(!response.ok)throw Error(data.error||'방에 접속하지 못했습니다.');credentials=data;sessionStorage.setItem(sessionKey(data.code),JSON.stringify(data));sessionStorage.setItem('runnerleague.active-room',data.code);localStorage.setItem(recoveryKey(data.code),JSON.stringify(data));localStorage.setItem('runnerleague.active-room',data.code);
+ const link=new URL(location.href);link.searchParams.set('room',data.code);history.replaceState(null,'',link);$('#online-menu')?.close();connecting('실시간 연결을 완료하고 있습니다…');connect();
+ }catch(error){connectedNotice();throw error}
 }
 let creationOrder=[...initialOrder],matchRanking=[...initialOrder];
 function renderCreationOrder(){
@@ -82,6 +90,7 @@ function readTurnLimit(prefix){
 }
 function bindTurnLimit(prefix){const unlimited=$('#'+prefix+'-unlimited'),seconds=$('#'+prefix+'-seconds');unlimited.onchange=()=>{seconds.disabled=unlimited.checked};unlimited.onchange()}
 function menu(mode='join'){
+ warmServer();
  creationOrder=[...initialOrder];
  let dialog=$('#online-menu');if(!dialog){dialog=el('dialog');dialog.id='online-menu';dialog.innerHTML='<h2>러너리그 드래프트</h2><p>혼자 진행하거나 팀장들과 온라인으로 선발하세요.</p><label>참가자 이름 (선택)<input id="online-name" maxlength="24" placeholder="생략하면 방장 / 참가자로 표시"></label><label>방 코드<input id="online-code" maxlength="6" placeholder="초대받은 6자리 코드"></label><details id="online-server-settings" hidden><summary>온라인 서버 설정</summary><label>서버 주소<input id="online-server-url" type="url" placeholder="https://서버주소.onrender.com"></label><p>GitHub Pages 주소가 아닌 별도 온라인 서버 주소입니다.</p></details><details id="create-settings" open><summary>방 생성 설정 · 드래프트 순서</summary><p>룩삼 → 콩콩 → 둥그레 → 푸린 → 울프 순서로 고정됩니다.</p><div id="create-order"></div><label>선발 제한 시간 (초)<input id="create-seconds" type="number" min="1" max="3600" step="1" value="30" inputmode="numeric"></label><label class="auto-pick-label"><input id="create-unlimited" type="checkbox"> 무제한</label><label class="auto-pick-label"><input id="create-auto-pick" type="checkbox" checked> 빈 팀 · 연결 끊긴 팀 자동 선발</label><p>빈 팀은 자동 진행합니다. 연결 끊김은 30초 동안 재접속을 기다립니다. 모두 나가면 자동 선발도 멈춥니다.</p></details><p id="online-status" role="status"></p><div class="online-menu-actions"><button id="mode-solo" class="secondary">혼자 하기</button><button id="mode-create" class="primary">온라인 방 만들기</button><button id="mode-join" class="secondary">방 참가하기</button></div>';document.body.append(dialog);
  bindTurnLimit('create');

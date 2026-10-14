@@ -1,7 +1,7 @@
-import {online} from './online.js?v=custom-time-1';
+import {online} from './online.js?v=mobile-fast-1';
 import './touch-drag.js';
 import './button-icons.js';
-import {players,roles,caps,initialOrder,teamAt,eligible} from './model.mjs?v=custom-time-1';
+import {players,roles,caps,initialOrder,teamAt,eligible} from './model.mjs?v=mobile-fast-1';
 const $=s=>document.querySelector(s),byId=id=>players.find(p=>p.id===id),displayRole=p=>p.name==='미정'?'미정':roles[p.role];
 let order=[...initialOrder],picks=[],started=false,coachMode=false,filter='all',coaches={},pendingAction=null,selectedCoachTeam=null,dragCaptain=null;
 let tanks=Object.fromEntries(initialOrder.map(team=>[team,team]));
