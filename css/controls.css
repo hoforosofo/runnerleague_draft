@@ -89,3 +89,10 @@ button.has-icon { display:inline-flex; align-items:center; justify-content:cente
 .captain[role=button] > div { display:block; }
 .captain[role=button] > div strong { display:none; }
 .captain[role=button] > div small { display:block; font-size:10px; line-height:1.4; }
+
+/* Use the exported board itself, preserving its team/round layout. */
+.snake-image-view{width:100%;overflow:auto;background:#f3f6fb;border-radius:12px}
+.snake-image-view img{display:block;width:100%;height:auto}
+.snake-image-view[hidden],.results-grid[hidden]{display:none}
+.snake-image-view p{text-align:center;padding:16px}
+@media(max-width:600px){.snake-image-view img{min-width:760px}.snake-image-view{overscroll-behavior-x:contain}}

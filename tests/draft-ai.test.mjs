@@ -5,7 +5,7 @@ import {evidenceWeight,weightedAdjustment,signals,WOLF_PROFILES} from '../cloudf
 import {players,initialOrder,eligible,teamAt} from '../shared/model.mjs';
 
 test('Latest captain context changes the draft without treating preferences as skill ranks',()=>{
- assert.equal(POLICY_VERSION,'runnerleague-community-v8');
+ assert.equal(POLICY_VERSION,'runnerleague-community-v9');
  const s={order:initialOrder,picks:[{player:'뱅',team:'룩삼'},{player:'김뿡',team:'콩콩'}]};
  assert.equal(chooseDraftPlayer(s,'둥그레').player.id,'큐베');
  s.picks.push({player:'큐베',team:'둥그레'});
@@ -57,7 +57,7 @@ test('Wolf fifth pair is conditional: double damage and damage/support both exis
   const b=chooseDraftPlayer(s,'울프').player;
   return [a,b];
  };
- assert.deepEqual(new Set(pair(['김뿡','뱅','남봉','양아지']).map(p=>p.id)),new Set(['큐베','디디디용']));
+ assert.deepEqual(new Set(pair(['양아지','남봉','눈꽃','아야츠노 유니']).map(p=>p.id)),new Set(['뱅','김뿡']));
  assert.deepEqual(new Set(pair(['김뿡','뱅','디디디용','마뫄']).map(p=>p.role)),new Set(['damage','support']));
 });
 

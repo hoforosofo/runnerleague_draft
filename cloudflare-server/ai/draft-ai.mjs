@@ -1,7 +1,7 @@
 import {players,eligible,teamAt} from '../../shared/model.mjs';
 import {WOLF_PROFILES,adjustment} from './draft-evidence.mjs';
 export {EVIDENCE_AS_OF} from './draft-evidence.mjs';
-export const POLICY_VERSION='runnerleague-community-v8';
+export const POLICY_VERSION='runnerleague-community-v9';
 const byId=new Map(players.map(p=>[p.id,p]));
 const profiles=Object.fromEntries(Object.entries(WOLF_PROFILES).map(([id,p])=>[id,Object.freeze({...p,value:p.value*.85+p.prior*.15+adjustment(id)})]));
 const tankNeeds={
@@ -18,11 +18,11 @@ const preference=(team,id)=>{
  if(team==='둥그레'&&['큐베','아야츠노 유니'].includes(id))return recent*3;
  if(team==='푸린'&&id==='디디디용')return recent*3;
  if(team==='푸린'&&['마뫄','양아지'].includes(id))return recent;
- if(team==='룩삼'&&id==='임나은')return recent;
+ if(team==='룩삼'&&['임나은','인섹'].includes(id))return recent*3;
  if(team==='울프'&&id==='마뫄')return recent;
  if(team==='룩삼'&&id==='뱅')return 7;
  if(team==='콩콩'&&id==='김뿡')return 4;
- if(team==='푸린'&&id==='눈꽃')return adjustment('푸린+눈꽃');
+ if(team==='푸린'&&id==='눈꽃')return recent*3;
  if(team==='콩콩'&&id==='눈꽃')return adjustment('콩콩+눈꽃');
  if(team==='콩콩'&&id==='서넹')return adjustment('콩콩+서넹');
  if(team==='울프'&&id==='디디디용')return adjustment('울프+디디디용');
@@ -37,6 +37,8 @@ export function evaluateDraftTeam(picks,team){
  if(d.length===2){
   score+=Math.max(mainFit(d[0])+subFit(d[1]),mainFit(d[1])+subFit(d[0]))*6;
   if(d.every(p=>profile(p).value<76))score-=54;
+  // Latest discussion identifies this exact pair as a risk, not every lower-tier pair.
+  if(d.some(p=>p.id==='뀨냥냥')&&d.some(p=>p.id==='꼴랑이'))score-=16;
   const heroUnion=new Set(d.flatMap(p=>profile(p).heroes));
   if(heroUnion.size<3)score-=7; // One shared comfort pick is vulnerable to bans.
  }
