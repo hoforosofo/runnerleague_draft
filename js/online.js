@@ -181,6 +181,27 @@ function receiveState(nextRoom) {
   if (room.state.started && !wasStarted) $('#online-lobby')?.close();
   else if ($('#online-lobby')?.open) renderLobby();
 }
+// Keep the draft on screen while removing all room credentials and reconnect timers.
+function roomClosed(message='방장이 방을 나가 방이 종료되었습니다. 오프라인으로 전환합니다.') {
+  const state=room?.state,peer=socket;
+  forget();credentials=null;room=null;socket=null;connected=false;stateFingerprint='';clearTimeout(retry);clearPending();closeConnecting();
+  $('#online-lobby')?.close();$('#online-menu')?.close();peer?.close();
+  const url=new URL(location.href);url.searchParams.delete('room');history.replaceState(null,'',url);
+  if(state)applyState(state);else applyPresence();refreshChrome();
+  let dialog=$('#room-closed-dialog');
+  if(!dialog){dialog=make('dialog');dialog.id='room-closed-dialog';const heading=make('h2','온라인 방 종료'),body=make('p'),button=make('button','확인','primary');button.onclick=()=>dialog.close();dialog.append(heading,body,button);document.body.append(dialog);}
+  dialog.querySelector('p').textContent=message;if(!dialog.open)dialog.showModal();
+}
+async function reconnectRoom(){
+  const saved=credentials;if(!saved)return;
+  try{
+    const response=await fetch(endpoint().replace(/\/$/,'')+`/rooms/${saved.code}/join`,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({token:saved.token}),signal:AbortSignal.timeout(8000)});
+    if(credentials!==saved)return;
+    if(response.status===404)return roomClosed();
+    if(response.ok)return connect();
+  }catch{}
+  if(credentials===saved)retry=setTimeout(reconnectRoom,1500);
+}
 function connect() {
   clearTimeout(retry);
   connected = false;
@@ -193,6 +214,7 @@ function connect() {
     if (socket !== peer || event.data === 'pong') return;
     let message;
     try { message = JSON.parse(event.data); } catch { return; }
+    if (message.type === 'room-closed') return roomClosed(message.message);
     if (message.type === 'state') receiveState(message.room);
     else if (message.type === 'ack' && message.requestId === pending) clearPending();
     else if (message.type === 'error') {
@@ -206,8 +228,9 @@ function connect() {
   peer.onclose = event => {
     if (socket !== peer) return;
     connected = false; clearPending(); refreshChrome(); applyPresence();
+    if (event.code === 4004) return roomClosed();
     if (event.code === 4001) return notify('다른 탭에서 같은 참가자로 접속했습니다.');
-    if (credentials) retry = setTimeout(connect, 1500);
+    if (credentials) retry = setTimeout(reconnectRoom, 1500);
   };
 }
 async function enter(create, name, code) {

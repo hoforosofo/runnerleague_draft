@@ -176,3 +176,5 @@ button.has-icon { display:inline-flex; align-items:center; justify-content:cente
 @media(max-width:700px){.online-room-entry{gap:5px}.online-member-count{font-size:11px;padding:4px 7px}.online-lobby-heading{flex-wrap:wrap;gap:6px}.connection-tools[data-mode=true]{grid-template-columns:minmax(0,1fr) auto}}
 
 .board-panel>.section-heading>h2{display:flex;align-items:center;gap:6px}#online-board-count{font-size:11px;padding:3px 7px;letter-spacing:0;font-variant-numeric:tabular-nums}
+
+#room-closed-dialog{width:min(420px,calc(100vw - 32px));box-sizing:border-box}#room-closed-dialog p{font-size:14px;line-height:1.7;color:#526987}#room-closed-dialog button{display:block;margin-left:auto;min-width:80px}

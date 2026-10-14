@@ -83,6 +83,8 @@ export class DraftRoom extends DurableObject {
  async arm(){
   const r=this.room;if(!r)return;
   const now=Date.now(),dates=[r.updatedAt+7*86400000];
+  const host=r.members.find(m=>m.id===r.hostId);
+  if(host?.disconnectedAt&&!r.sockets.has(host.id))dates.push(host.disconnectedAt+30000);
   for(const ws of this.ctx.getWebSockets()){const a=ws.deserializeAttachment();if(!a?.memberId)dates.push((a?.createdAt||now)+10000);}
   if(r.state.started&&!r.state.resultsConfirmed&&r.sockets.size){
    const index=nextIndex(r),owner=r.members.find(m=>m.team===r.state.turnOwners[index]);
@@ -147,6 +149,8 @@ export class DraftRoom extends DurableObject {
   const r=this.room;if(!r)return;const now=Date.now();
   for(const ws of this.ctx.getWebSockets()){const a=ws.deserializeAttachment();if(!a?.memberId&&now-(a?.createdAt||0)>=10000)ws.close(1008,'인증 시간 초과');}
   if(r.deleted||!r.sockets.size&&now-r.updatedAt>=7*86400000){r.deleted=true;await this.save();return;}
+  const host=r.members.find(m=>m.id===r.hostId);
+  if(host?.disconnectedAt&&!r.sockets.has(host.id)&&now-host.disconnectedAt>=30000){leaveRoom(r,host);await this.save();return;}
   const turn=automaticTurn(r,now);
   if(turn){
    const decision=chooseDraftPlayer(r.state,turn.team),p=decision?.player;
