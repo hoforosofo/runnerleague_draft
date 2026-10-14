@@ -1,15 +1,14 @@
-import {portraitMarkup,portraitSlices} from './portrait-layout.mjs?v=photo-clean-1';
-import {online} from './online.js?v=photo-clean-1';
+import {online} from './online.js?v=mobile-fast-1';
 import './touch-drag.js';
 import './button-icons.js';
-import {players,roles,caps,initialOrder,teamAt,eligible} from './model.mjs?v=photo-clean-1';
+import {players,roles,caps,initialOrder,teamAt,eligible} from './model.mjs?v=mobile-fast-1';
 const $=s=>document.querySelector(s),byId=id=>players.find(p=>p.id===id),displayRole=p=>p.name==='미정'?'미정':roles[p.role];
 let order=[...initialOrder],picks=[],started=false,coachMode=false,filter='all',coaches={},pendingAction=null,selectedCoachTeam=null,dragCaptain=null;
 let tanks=Object.fromEntries(initialOrder.map(team=>[team,team]));
 const rosterRank=new Map(players.map((p,i)=>[p.id,i]));
 const sortRoster=list=>[...list].sort((a,b)=>rosterRank.get(a.id)-rosterRank.get(b.id));
 const colors=['#8fbbff','#c3a0ee','#e6b879','#75cfc7','#df8daa'];
-const avatar=portraitMarkup;
+const avatar=(p,extra='')=>p.image?`<img class="avatar ${extra}" src="${p.image}" alt="${p.name}" draggable="false">`:`<span class="avatar photo-empty ${extra}" aria-label="${p.name} 사진 없음">${p.name.slice(0,2)}</span>`;
 let turnOwners=[],resultsConfirmed=false,completionPrompted=false,resultView='horizontal';
 const total=()=>20;
 const chosen=()=>picks.filter(Boolean);
@@ -98,15 +97,6 @@ function renderResults(){
  $('#edit-draft').onclick=()=>{if(online.action('edit'))return;resultsConfirmed=false;completionPrompted=true;render();window.scrollTo(0,0)};
  $('#restart-draft').onclick=()=>{reset(true);window.scrollTo(0,0)};
 }
-function drawFramedPortrait(ctx,img,x,y,w,h){
- const fh=Math.min(h,w*4/3),fw=fh*3/4,fx=x+(w-fw)/2,fy=y+(h-fh)/2,pad=4;
- ctx.save();ctx.fillStyle='#f7faff';ctx.strokeStyle='#2463eb';ctx.lineWidth=2;
- ctx.beginPath();ctx.roundRect(fx+1,fy+1,fw-2,fh-2,6);ctx.fill();ctx.stroke();
- const slices=portraitSlices(img.src,img.naturalWidth,img.naturalHeight),share=slices.photo[3]/(slices.photo[3]+slices.label[3]),iw=fw-pad*2,ih=fh-pad*2,ph=ih*share;
- ctx.drawImage(img,...slices.photo,fx+pad,fy+pad,iw,ph);
- ctx.drawImage(img,...slices.label,fx+pad,fy+pad+ph,iw,ih-ph);
- ctx.restore();
-}
 async function downloadSnakeImage(){
  const button=$('#save-snake-results');if(button.disabled)return;button.disabled=true;button.textContent='저장 중…';
  try{
@@ -114,7 +104,7 @@ async function downloadSnakeImage(){
   const canvas=document.createElement('canvas');canvas.width=1600;canvas.height=960;
   const ctx=canvas.getContext('2d');ctx.fillStyle='#f3f6fb';ctx.fillRect(0,0,1600,960);
   const text=(value,x,y,size=18,color='#17243b')=>{ctx.font=`650 ${size}px League, sans-serif`;ctx.fillStyle=color;ctx.fillText(value,x,y)};
-  const portrait=async(p,x,y,w,h)=>{if(!p)return;const img=new Image();img.src=p.image;await img.decode();drawFramedPortrait(ctx,img,x,y,w,h)};
+  const portrait=async(p,x,y,w,h)=>{if(!p)return;const img=new Image();img.src=p.image;await img.decode();const scale=Math.min(w/img.naturalWidth,h/img.naturalHeight);ctx.drawImage(img,x+(w-img.naturalWidth*scale)/2,y+(h-img.naturalHeight*scale)/2,img.naturalWidth*scale,img.naturalHeight*scale)};
   text('RUNNER LEAGUE / SNAKE DRAFT',32,36,16,'#2463eb');text('스네이크 드래프트 · 선발 순서',32,82,32);
   const rounds=total()/5,cellWidth=1308/rounds;
   for(let round=0;round<rounds;round++)text(`${round+1}라운드`,230+round*cellWidth,122,17,'#7b889d');
@@ -144,7 +134,7 @@ async function downloadResultsImage(){
   text('RUNNER LEAGUE / DRAFT COMPLETE',32,34,14,'#2463eb',750);text('최종 팀 구성',32,76,32,'#17243b',800);
   const loadImage=async p=>{if(!p.image)return null;const img=new Image();img.src=p.image;await img.decode();return img};
   const images=new Map(await Promise.all(players.map(async p=>[p.id,await loadImage(p)])));
-  const portrait=(p,x,y,w,h)=>{const img=images.get(p.id);if(!img){text(p.name,x,y+h/2,14);return}drawFramedPortrait(ctx,img,x,y,w,h)};
+  const portrait=(p,x,y,w,h)=>{const img=images.get(p.id);if(!img){text(p.name,x,y+h/2,14);return}const scale=Math.min(w/img.naturalWidth,h/img.naturalHeight),iw=img.naturalWidth*scale,ih=img.naturalHeight*scale;ctx.drawImage(img,x+(w-iw)/2,y+(h-ih)/2,iw,ih)};
   for(const [i,team] of order.entries()){
    const roster=chosen().filter(p=>p.team===team).map(p=>byId(p.player));
    const members=[byId(tanks[team]),...sortRoster(roster.filter(p=>p.role==='damage')),...sortRoster(roster.filter(p=>p.role==='support')),...roster.filter(p=>p.role==='coach')];

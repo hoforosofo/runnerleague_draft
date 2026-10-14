@@ -1,4 +1,3 @@
-import {portraitElement} from './portrait-layout.mjs?v=photo-clean-1';
 import {ONLINE_SERVER_URL} from './online-config.js';
 import {initialOrder,players} from './model.mjs?v=mobile-fast-1';
 const $=s=>document.querySelector(s);
@@ -80,7 +79,7 @@ function renderCreationOrder(){
   card.ondragend=()=>card.classList.remove('dragging');
   card.ondragover=e=>{if(e.dataTransfer.types.includes('application/x-create-order')){e.preventDefault();e.dataTransfer.dropEffect='move'}};
   card.ondrop=e=>{e.preventDefault();const source=e.dataTransfer.getData('application/x-create-order');if(source!=='')swap(Number(source),index)};
-  const frame=portraitElement(players.find(p=>p.id===team));label.append(frame,select);card.append(label);box.append(card);
+  label.append(img,select);card.append(label);box.append(card);
  });
 }
 function readTurnLimit(prefix){
@@ -114,7 +113,7 @@ function openLobby(){
  const copy=el('button','초대 링크 복사','secondary');copy.onclick=async()=>{const url=new URL(location.href);url.searchParams.set('room',room.code);try{await navigator.clipboard.writeText(url.href);copy.textContent='복사되었습니다'}catch{notify(url.href)}};dialog.append(copy);
  const waiting=room.members.find(m=>!m.team&&!m.spectator),me=mine();dialog.append(el('p',room.state.started?'드래프트가 시작되었습니다.':waiting?`${waiting.name}님이 팀장 캐릭터를 선택할 차례입니다.`:'팀 선택이 완료되었습니다. 방장이 시작할 수 있습니다.'));
  const members=el('div',undefined,'online-members');for(const m of room.members){const row=el('div',undefined,'online-member');row.append(el('strong',`${m.name}${m.id===room.hostId?' · 방장':''}`),el('span',`${m.team||(m.spectator?'관전':'미선택')} · ${m.connected?'접속 중':room.state.autoPick?'연결 끊김 · 자동 선발 대기':'연결 끊김'}`));if(isHost()&&!room.state.started&&m.id!==me.id){const release=el('button','자리 비우기','text-btn');release.onclick=()=>action('release',{memberId:m.id});row.append(release)}members.append(row)}if(room.state.autoPick)for(const team of room.state.order)if(!room.members.some(m=>m.team===team)){const row=el('div',undefined,'online-member');row.append(el('strong',`${team} 팀`),el('span','팀장 없음 · 자동 선발'));members.append(row)}dialog.append(members);
- const teams=el('div',undefined,'online-team-options');for(const [index,team] of room.state.order.entries()){const button=el('button',undefined,'secondary');const img=el('img');img.src=players.find(p=>p.id===team).image;img.alt=team;const frame=el('span',undefined,'portrait-frame');frame.append(img);button.append(el('small',`${index+1}번`),frame,el('strong',team));button.disabled=room.members.some(m=>m.team===team);button.dataset.onlineTeam=team;button.setAttribute('aria-pressed',String(me?.team===team));button.onclick=()=>action('claim',{team});teams.append(button)}dialog.append(teams);
+ const teams=el('div',undefined,'online-team-options');for(const [index,team] of room.state.order.entries()){const button=el('button',undefined,'secondary');const img=el('img');img.src=players.find(p=>p.id===team).image;img.alt=team;button.append(el('small',`${index+1}번`),img,el('strong',team));button.disabled=room.members.some(m=>m.team===team);button.dataset.onlineTeam=team;button.setAttribute('aria-pressed',String(me?.team===team));button.onclick=()=>action('claim',{team});teams.append(button)}dialog.append(teams);
  if(!me?.spectator){const spectator=el('button','관전으로 전환','secondary');spectator.id='online-spectate';spectator.onclick=()=>action('spectate');dialog.append(spectator)}
  const limit=room.state.turnLimitMs??30000;
  const timeInfo=el('p',limit===0?'선발 제한 시간: 무제한':'선발 제한 시간: '+(limit/1000)+'초');dialog.append(timeInfo);
