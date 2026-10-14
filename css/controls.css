@@ -1,0 +1,91 @@
+/* 공통 버튼: 아이콘 크기를 고정해 표시가 바뀌어도 배치가 흔들리지 않게 합니다. */
+.button-icon { width:18px; height:18px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+button.has-icon { display:inline-flex; align-items:center; justify-content:center; gap:7px; }
+.primary,.secondary { min-height:40px; padding:8px 12px; font-size:13px; font-weight:700; line-height:1.35; border-radius:9px; }
+.text-btn { min-height:36px; padding:6px 9px; }
+.tools .secondary { font-size:12px; padding:7px 10px; }
+.header-right { gap:14px; }
+.header-right > .tag,.header-right > .desktop { display:none; }
+.connection-tools,.draft-save-tools { display:flex; align-items:center; gap:8px; }
+.connection-tools { padding-right:14px; border-right:1px solid #e0e7f1; }
+.connection-tools button { min-height:42px; white-space:nowrap; }
+.draft-save-tools .secondary { font-size:13px; min-height:40px; }
+.online-role-status { color:#64748b; font-size:12px; white-space:nowrap; }
+.online-lobby-title { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.online-lobby-title h2 { margin:0; }
+
+/* 방 상태와 공유 기능을 한 곳에 모았습니다. */
+.board-panel > .section-heading { flex-wrap:wrap; gap:8px; }
+.online-room-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; width:100%; padding-top:8px; border-top:1px solid #e7edf5; }
+.online-room-toolbar .secondary { font-size:12px; min-height:36px; padding:7px 10px; }
+.room-status { display:inline-flex; align-items:center; gap:6px; color:#18774f; background:#e9f8ef; border-radius:20px; padding:6px 9px; font-size:11px; font-weight:700; white-space:nowrap; }
+.room-status::before { content:''; width:6px; height:6px; border-radius:50%; background:#20a363; }
+.room-status.reconnecting { color:#8b5e16; background:#fff4da; }
+.room-status.reconnecting::before { background:#c38c27; }
+.online-room-code { color:#2463eb; font-family:monospace; font-size:14px; letter-spacing:.08em; user-select:all; }
+#online-copy-invite { margin-left:auto; min-width:152px; }
+.captain[role=button] { cursor:pointer; transition:border-color .15s,background .15s,box-shadow .15s; }
+.captain[role=button]:hover,.captain[role=button]:focus-visible { border-color:#8bb4ff; box-shadow:0 0 0 2px #2463eb16; outline:none; }
+.captain.is-selected { border-color:#2463eb; background:#edf4ff; box-shadow:inset 0 0 0 1px #2463eb; }
+.captain.is-selected small { color:#2463eb; font-weight:700; }
+.captain.is-taken { cursor:default; }
+.captain.is-taken small { color:#718198; }
+.online-team-options button[aria-pressed=true] { background:#edf4ff; border-color:#2463eb; }
+.captain .avatar { height:70px; }
+.setup-bottom { gap:8px; }
+.setup-action { display:flex; align-items:center; gap:8px; }
+.results-actions button { font-size:13px; padding:9px 13px; min-height:42px; }
+.saved-actions { max-width:310px; }
+
+/* 모바일에서도 팝업이 현재 화면 너비를 넘지 않게 제한합니다. */
+#online-menu,#online-lobby,#online-connecting { box-sizing:border-box; position:fixed; inset:0; margin:auto; width:min(620px,calc(100vw - 24px)); max-width:calc(100vw - 24px); max-height:calc(100dvh - 24px); overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; }
+#online-menu label,#online-lobby label { min-width:0; }
+#online-menu input:not([type=checkbox]) { box-sizing:border-box; width:100%; min-width:0; font:inherit; padding:10px; border:1px solid #d7e2ef; border-radius:8px; }
+#online-menu .auto-pick-label { display:flex; align-items:center; gap:10px; min-height:44px; white-space:normal; line-height:1.5; font-size:13px; }
+#online-menu input[type=checkbox] { display:inline-block; flex:0 0 20px; width:20px; height:20px; min-width:20px; padding:0; margin:0; accent-color:#2463eb; }
+#create-settings h3 { margin:0 0 12px; font-size:13px; }
+.create-order-card { cursor:default; }
+.create-order-card small { color:#526987; font-size:12px; font-weight:700; }
+.online-menu-actions { display:flex; justify-content:flex-end; gap:8px; }
+.online-menu-actions button { min-height:44px; font-size:14px; }
+#online-connecting { max-width:min(420px,calc(100vw - 24px)); }
+.connection-progress { display:flex; align-items:center; gap:12px; min-height:58px; font-size:15px; font-weight:700; }
+.connection-spinner { width:22px; height:22px; border:3px solid #dce7fb; border-top-color:#2463eb; border-radius:50%; animation:connection-spin .8s linear infinite; flex-shrink:0; }
+@keyframes connection-spin { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { .connection-spinner { animation:none; } .captain[role=button] { transition:none; } }
+@media(min-width:701px) and (max-width:1099px) { .brand { font-size:14px; } .header-right { gap:7px; } .connection-tools { gap:6px; padding-right:7px; } .connection-tools button,.draft-save-tools .secondary { font-size:12px; padding:8px; } .button-icon { width:16px; height:16px; } }
+@media(max-width:700px) {
+ header { padding:12px; gap:12px; }
+ .brand { font-size:15px; }
+ .header-right { width:100%; display:flex; flex-wrap:wrap; gap:8px; margin:0; }
+ .connection-tools { width:100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:0; border:0; }
+ .connection-tools[data-mode=true] { grid-template-columns:auto minmax(0,1fr); }
+ .connection-tools button { min-height:44px; font-size:13px; }
+ #online-start { grid-column:1/-1; }
+ .online-role-status { text-align:right; font-size:12px; }
+ .draft-save-tools { width:100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+ .draft-save-tools .secondary,.primary,.secondary,.tools .secondary { min-height:42px; font-size:13px; padding:8px 11px; }
+ .captain .avatar { height:82px; }
+ .online-room-toolbar { flex-wrap:wrap; gap:6px; }
+ .online-room-toolbar .secondary { min-height:40px; font-size:12px; padding:7px 9px; }
+ #online-copy-invite { min-width:0; }
+ .room-status { font-size:10px; padding:6px 8px; }
+ .online-room-code { font-size:12px; }
+ .results-actions button { font-size:12px; padding:9px 8px; }
+ .saved-actions { max-width:none; }
+ #online-menu,#online-lobby { padding:16px; border-radius:14px; }
+ #online-menu h2,#online-lobby h2 { font-size:20px; }
+ #online-menu label { font-size:14px; }
+ #online-menu input:not([type=checkbox]) { font-size:16px; }
+ #create-order { gap:5px; }
+ .create-order-card { padding:5px 3px; }
+ .create-order-card img { height:64px; }
+ .online-menu-actions { display:grid; grid-template-columns:1fr 1fr; }
+ .online-menu-actions button { min-height:48px; }
+ .online-lobby-title .online-role-status { font-size:11px; }
+}
+
+/* 이미지에 이름이 있으므로 온라인 카드에는 참여 상태만 표시합니다. */
+.captain[role=button] > div { display:block; }
+.captain[role=button] > div strong { display:none; }
+.captain[role=button] > div small { display:block; font-size:10px; line-height:1.4; }
