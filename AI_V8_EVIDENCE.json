@@ -1,0 +1,156 @@
+{
+  "policyVersion": "runnerleague-community-v8",
+  "asOf": "2026-10-14T19:01:00+09:00",
+  "postCount": 3633,
+  "commentCount": 14699,
+  "uniqueUrls": 3633,
+  "oldEvidenceHalfLifeHours": 12,
+  "filesAreSameCollection": true,
+  "selectedSignals": [
+    {
+      "source": "https://www.fmkorea.com/10446136648",
+      "at": "2026-10-14T17:56:00+09:00",
+      "key": "큐베",
+      "delta": 7,
+      "reliability": 0.8,
+      "event": "oct14-cuve-performance",
+      "note": "소우릎 수행 평가. 같은 발언의 재전재는 한 사건으로 처리"
+    },
+    {
+      "source": "https://www.fmkorea.com/10445910557",
+      "at": "2026-10-14T16:59:00+09:00",
+      "key": "둥그레+큐베",
+      "delta": 28,
+      "reliability": 0.55,
+      "event": "oct14-dong-plan",
+      "note": "3번 큐베 우선 계획 관측"
+    },
+    {
+      "source": "https://www.fmkorea.com/10445970528",
+      "at": "2026-10-14T17:12:00+09:00",
+      "key": "둥그레+아야츠노 유니",
+      "delta": 25,
+      "reliability": 0.9,
+      "event": "oct14-dong-uni",
+      "note": "팀장 직접 발언: 고점을 위해 유니 선호. 인섹 기량 하락으로 환산하지 않음"
+    },
+    {
+      "source": "https://www.fmkorea.com/10446212055",
+      "at": "2026-10-14T18:21:00+09:00",
+      "key": "푸린+디디디용",
+      "delta": 24,
+      "reliability": 0.8,
+      "event": "oct14-purin-plan",
+      "note": "4픽 띠용 검토. 이후 양아지 재검토와 상충하므로 고정하지 않음"
+    },
+    {
+      "source": "https://www.fmkorea.com/10446322390",
+      "at": "2026-10-14T18:57:00+09:00",
+      "key": "푸린+마뫄",
+      "delta": -8,
+      "reliability": 0.6,
+      "event": "oct14-purin-plan",
+      "note": "마뫄 개인 기량보다 메인딜 역할 비선호. 섭딜 검증 후 재고려"
+    },
+    {
+      "source": "https://www.fmkorea.com/10446322390",
+      "at": "2026-10-14T18:57:00+09:00",
+      "key": "푸린 상위딜",
+      "delta": -8,
+      "reliability": 0.6,
+      "event": "oct14-purin-plan",
+      "note": "디디디용을 선호하고 마뫄 섭딜도 재고려: 기존 포괄적 딜러 감점 완화"
+    },
+    {
+      "source": "https://www.fmkorea.com/10446196745",
+      "at": "2026-10-14T18:16:00+09:00",
+      "key": "울프+마뫄",
+      "delta": 12,
+      "reliability": 0.85,
+      "event": "oct14-wolf-pair",
+      "note": "딜러 성장 미관측시 양뫄도 고려. 양봉을 확정 플랜으로 적용하지 않음"
+    },
+    {
+      "source": "https://www.fmkorea.com/10446233018",
+      "at": "2026-10-14T18:28:00+09:00",
+      "key": "삐부+멘딜",
+      "delta": 14,
+      "reliability": 0.6,
+      "event": "oct14-pipu-carry",
+      "note": "명확한 캐리 딜러를 받치는 케어의 조합 가치"
+    },
+    {
+      "source": "https://www.fmkorea.com/10445907293",
+      "at": "2026-10-14T16:58:00+09:00",
+      "key": "유니+삐부",
+      "delta": 12,
+      "reliability": 0.7,
+      "event": "oct14-uni-care",
+      "note": "유니의 본대힐 파트너 선호. 1팀 맥락의 일반화는 제한"
+    },
+    {
+      "source": "https://www.fmkorea.com/10445933950",
+      "at": "2026-10-14T17:04:00+09:00",
+      "key": "룩삼+임나은",
+      "delta": 10,
+      "reliability": 0.55,
+      "event": "oct14-look-ana",
+      "note": "윈스턴-아나 시너지와 뱅-메르시 플랜을 구분"
+    },
+    {
+      "source": "https://www.fmkorea.com/10446240947",
+      "at": "2026-10-14T18:31:00+09:00",
+      "key": "아야츠노 유니",
+      "delta": 4,
+      "reliability": 0.45,
+      "event": "oct14-uni-call",
+      "note": "적극적 소통 수행 관측. 강한 IGL로 단정하지 않음"
+    },
+    {
+      "source": "https://www.fmkorea.com/10446298283",
+      "at": "2026-10-14T18:50:00+09:00",
+      "key": "인섹",
+      "delta": 4,
+      "reliability": 0.45,
+      "event": "oct14-insec-performance",
+      "note": "뽕 타이밍 관측"
+    },
+    {
+      "source": "https://www.fmkorea.com/10444063103",
+      "at": "2026-10-14T00:37:00+09:00",
+      "key": "정령왕",
+      "delta": 4,
+      "reliability": 0.5,
+      "event": "oct14-jung-performance",
+      "note": "리퍼 수행 관측. 코칭 참여를 확정 성장으로 환산하지 않음"
+    },
+    {
+      "source": "https://www.fmkorea.com/10445900762",
+      "at": "2026-10-14T16:56:00+09:00",
+      "key": "뀨냥냥",
+      "delta": -3,
+      "reliability": 0.35,
+      "event": "oct14-low-damage",
+      "note": "낮은 딜러 평가를 보수적으로 유지"
+    },
+    {
+      "source": "https://www.fmkorea.com/10446207146",
+      "at": "2026-10-14T18:19:00+09:00",
+      "key": "큐베",
+      "delta": 5,
+      "reliability": 0.75,
+      "event": "oct14-cuve-role",
+      "note": "사이드 섭딜 영향력 평가. 메인딜 DPS 동급 발언은 상황 제한"
+    },
+    {
+      "source": "https://www.fmkorea.com/10446325252",
+      "at": "2026-10-14T18:58:00+09:00",
+      "key": "푸린+양아지",
+      "delta": 8,
+      "reliability": 0.45,
+      "event": "oct14-purin-reconsideration",
+      "note": "가장 최신 글은 양아지 세계선 재검토. 확정 선호로 보지 않고 약하게 반영"
+    }
+  ],
+  "method": "Full corpus metadata and candidate scan; contextual review of selected posts and comments. Numeric deltas are curated judgments, not measured skill or match outcomes. No image/video contents inferred."
+}

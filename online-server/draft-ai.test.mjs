@@ -1,8 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {chooseDraftPlayer,draftProfile,evaluateDraftTeam} from './draft-ai.mjs';
+import {chooseDraftPlayer,draftProfile,evaluateDraftTeam,rankDraftCandidates,POLICY_VERSION} from './draft-ai.mjs';
 import {evidenceWeight,weightedAdjustment,signals,WOLF_PROFILES} from './draft-evidence.mjs';
 import {players,initialOrder,eligible,teamAt} from './model.mjs';
+
+test('Latest captain context changes the draft without treating preferences as skill ranks',()=>{
+ assert.equal(POLICY_VERSION,'runnerleague-community-v8');
+ const s={order:initialOrder,picks:[{player:'뱅',team:'룩삼'},{player:'김뿡',team:'콩콩'}]};
+ assert.equal(chooseDraftPlayer(s,'둥그레').player.id,'큐베');
+ s.picks.push({player:'큐베',team:'둥그레'});
+ assert.equal(chooseDraftPlayer(s,'푸린').player.id,'디디디용');
+ s.picks.push({player:'디디디용',team:'푸린'});
+ const first=chooseDraftPlayer(s,'울프').player;
+ s.picks.push({player:first.id,team:'울프'});
+ const second=chooseDraftPlayer(s,'울프').player;
+ assert.deepEqual(new Set([first.id,second.id]),new Set(['양아지','마뫄']));
+ const legal=rankDraftCandidates(s,'울프');
+ assert.ok(legal.some(x=>x.player.id==='남봉'),'Double support remains a considered option, not a prohibited role');
+ assert.ok(draftProfile('아야츠노 유니').order<draftProfile('남봉').order,'Preference must not fabricate stronger IGL skill');
+});
 
 test('Newest evidence dominates; copied reports of one event count once',()=>{
  const now='2026-10-13T21:00:00+09:00';

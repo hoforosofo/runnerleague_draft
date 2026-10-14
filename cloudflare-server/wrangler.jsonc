@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "runnerleague-online",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-08-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "vars": {"ALLOWED_ORIGINS": "https://hoforosofo.github.io,http://127.0.0.1:8766,http://localhost:8766"},
+  "durable_objects": {"bindings": [
+    {"name": "ROOMS", "class_name": "DraftRoom"},
+    {"name": "LOBBY", "class_name": "MatchLobby"}
+  ]},
+  "migrations": [{"tag": "v1", "new_sqlite_classes": ["DraftRoom", "MatchLobby"]}]
+}

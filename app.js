@@ -1,7 +1,7 @@
-import {online} from './online.js?v=unlimited-room-1';
+import {online} from './online.js?v=cloudflare-v1';
 import './touch-drag.js';
 import './button-icons.js';
-import {players,roles,caps,initialOrder,teamAt,eligible} from './model.mjs?v=unlimited-room-1';
+import {players,roles,caps,initialOrder,teamAt,eligible} from './model.mjs?v=cloudflare-v1';
 const $=s=>document.querySelector(s),byId=id=>players.find(p=>p.id===id),displayRole=p=>p.name==='미정'?'미정':roles[p.role];
 let order=[...initialOrder],picks=[],started=false,coachMode=false,filter='all',coaches={},pendingAction=null,selectedCoachTeam=null,dragCaptain=null;
 let tanks=Object.fromEntries(initialOrder.map(team=>[team,team]));

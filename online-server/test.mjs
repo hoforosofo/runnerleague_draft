@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync,readFileSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {WebSocket} from 'ws';
@@ -29,6 +29,25 @@ async function post(url,data){const response=await fetch(base+url,{method:'POST'
 async function client(credentials){const ws=new WebSocket(`ws://127.0.0.1:${port}/ws`,{origin});let room;await new Promise((resolve,reject)=>{ws.once('open',()=>ws.send(JSON.stringify({type:'auth',code:credentials.code,token:credentials.token})));ws.once('error',reject);ws.on('message',raw=>{const msg=JSON.parse(raw);if(msg.type==='state'){room=msg.room;resolve()}})});return {ws,get room(){return room},async cmd(action,data={}){await new Promise(resolve=>setTimeout(resolve,10));const revision=room.revision,requestId=crypto.randomUUID();return new Promise((resolve,reject)=>{const timeout=setTimeout(()=>{ws.off('message',listener);reject(Error('response timeout'))},3000);function listener(raw){const msg=JSON.parse(raw);if(msg.requestId===requestId&&(msg.type==='error'||msg.type==='ack')){clearTimeout(timeout);ws.off('message',listener);resolve(msg)}}ws.on('message',listener);ws.send(JSON.stringify({type:'command',action,data,revision,requestId}))})}}}
 const good=msg=>assert.equal(msg.type,'ack',JSON.stringify(msg));
 const denied=msg=>assert.equal(msg.type,'error',JSON.stringify(msg));
+test('Ordinary rooms are unlimited and old time controls cannot impose a limit',async()=>{
+ const clients=[];
+ try{
+  await start();
+  const token=await post('/rooms',{turnLimitSeconds:1,autoPick:false}),host=await client(token);clients.push(host);
+  assert.equal(host.room.state.turnLimitMs,0);
+  good(await host.cmd('claim',{team:initialOrder[0]}));
+  for(let i=1;i<5;i++){const t=await post('/rooms/'+token.code+'/join',{}),peer=await client(t);clients.push(peer);good(await peer.cmd('claim',{team:initialOrder[i]}))}
+  denied(await host.cmd('turnLimit',{seconds:30}));
+  good(await host.cmd('start'));assert.equal(host.room.state.turnTimer.deadline,null);
+  await delay(1500);assert.equal(host.room.state.picks.filter(Boolean).length,0);
+  good(await host.cmd('pick',{player:'김뿡'}));assert.equal(host.room.state.turnTimer.deadline,null);
+  good(await host.cmd('reset'));assert.equal(host.room.state.turnLimitMs,0);
+  good(await host.cmd('start'));assert.equal(host.room.state.turnTimer.deadline,null);
+  for(const c of clients)c.ws.close();await stop();
+  const saved=JSON.parse(readFileSync(path.join(dir,'rooms.json'),'utf8'));for(const room of saved){room.state.turnLimitMs=30000;if(room.state.turnTimer)room.state.turnTimer.deadline=Date.now()+30000;}writeFileSync(path.join(dir,'rooms.json'),JSON.stringify(saved));await start();
+  const restored=await client(token);clients.push(restored);assert.equal(restored.room.state.turnLimitMs,0);assert.equal(restored.room.state.turnTimer.deadline,null);
+ }finally{for(const c of clients)c.ws.terminate();await stop();rmSync(dir,{recursive:true,force:true})}
+});
 test('Online authority, sequential claims, complete draft and server restart',async()=>{
  const clients=[];
  try{await start();const owner=await post('/rooms',{name:'방장',autoPick:false}),host=await client(owner);clients.push(host);good(await host.cmd('spectate'));const credentials=[];
@@ -52,8 +71,8 @@ test('Custom order, blank name, absent teams, reconnect grace and offline pause'
  for(let i=0;i<4;i++){const c=await post('/matchmaking',{name:'매칭'+i,team:initialOrder[i]});matchTokens.push(c);const peer=await client(c);clients.push(peer);matchClients.push(peer);assert.equal(peer.room.state.started,false);assert.ok(peer.room.members.every(m=>m.team===null));}
  assert.equal(new Set(matchTokens.map(c=>c.code)).size,1);
  denied(await matchClients[0].cmd('start'));denied(await matchClients[0].cmd('claim',{team:initialOrder[0]}));
- const fifth=await post('/matchmaking',{name:'매칭4',team:initialOrder[4]});assert.equal(fifth.code,matchTokens[0].code);const fifthClient=await client(fifth);clients.push(fifthClient);await until(()=>matchClients[0].room.state.matchPhase==='voting');matchClients.push(fifthClient);matchTokens.push(fifth);for(const c of matchClients)good(await c.cmd('matchVote',{ranking:initialOrder}));assert.deepEqual(fifthClient.room.state.choiceOrder,[...initialOrder].reverse());assert.equal(fifthClient.room.state.matchScores[initialOrder[0]],25);const byTeam=new Map(matchTokens.map((token,i)=>[fifthClient.room.members.find(m=>m.id===token.memberId).team,matchClients[i]]));denied(await byTeam.get(initialOrder[0]).cmd('matchPosition',{position:0}));for(const [i,team] of [...initialOrder].reverse().entries())good(await byTeam.get(team).cmd('matchPosition',{position:i}));await until(()=>matchClients[0].room.state.started&&fifthClient.room.state.started);assert.deepEqual(fifthClient.room.state.order,[...initialOrder].reverse());
- assert.equal(new Set(fifthClient.room.members.map(m=>m.team)).size,5);assert.ok(fifthClient.room.members.every(m=>m.connected));
+ const fifth=await post('/matchmaking',{name:'매칭4',team:initialOrder[4]});assert.equal(fifth.code,matchTokens[0].code);const fifthClient=await client(fifth);clients.push(fifthClient);await until(()=>matchClients[0].room.state.started&&fifthClient.room.state.started);assert.deepEqual(fifthClient.room.state.order,initialOrder);assert.equal(fifthClient.room.state.turnLimitMs,30000);assert.ok(fifthClient.room.state.turnTimer.deadline>Date.now());assert.ok(fifthClient.room.state.turnTimer.deadline-Date.now()<=30000);denied(await fifthClient.cmd('matchPosition',{position:0}));
+ assert.equal(new Set(fifthClient.room.members.map(m=>m.team)).size,5);assert.ok(fifthClient.room.members.every(m=>m.connected));good(await matchClients[0].cmd('reset'));assert.equal(matchClients[0].room.state.matchmaking,true);assert.equal(matchClients[0].room.state.turnLimitMs,30000);assert.ok(matchClients[0].room.state.turnTimer.deadline>Date.now());
  const nextMatch=await post('/matchmaking',{team:initialOrder[0]});assert.notEqual(nextMatch.code,fifth.code);const cancelled=await client(nextMatch);clients.push(cancelled);cancelled.ws.close();await delay(100);
  const replacement=await post('/matchmaking',{team:initialOrder[0]});const replacementClient=await client(replacement);clients.push(replacementClient);assert.equal(replacementClient.room.members.length,1);
  const randomOwner=await post('/rooms',{randomMatching:true,autoPick:false}),randomHost=await client(randomOwner);clients.push(randomHost);
@@ -64,7 +83,7 @@ test('Custom order, blank name, absent teams, reconnect grace and offline pause'
  const oldTeam=randomHost.room.members[0].team;
  const recovered=await post(`/rooms/${randomOwner.code}/join`,{token:randomOwner.token});assert.equal(recovered.memberId,randomOwner.memberId);
  good(await randomHost.cmd('spectate'));good(await randomHost.cmd('claim',{team:oldTeam}));assert.equal(randomHost.room.members[0].team,oldTeam);
- const order=[...initialOrder].reverse(),owner=await post('/rooms',{order}),host=await client(owner);clients.push(host);assert.equal(host.room.members[0].name,'참가자');assert.deepEqual(host.room.state.order,order);good(await host.cmd('spectate'));
+ const order=[...initialOrder],owner=await post('/rooms',{order:[...initialOrder].reverse()}),host=await client(owner);clients.push(host);assert.equal(host.room.members[0].name,'참가자');assert.deepEqual(host.room.state.order,order);denied(await host.cmd('order',{from:0,to:4}));good(await host.cmd('spectate'));
  const guestToken=await post(`/rooms/${owner.code}/join`,{}),guest=await client(guestToken);clients.push(guest);good(await guest.cmd('claim',{team:order[0]}));good(await host.cmd('start'));guest.ws.close();await delay(800);assert.equal(host.room.state.picks.filter(Boolean).length,0);
  const returned=await client(guestToken);clients.push(returned);await delay(900);assert.equal(host.room.state.picks.filter(Boolean).length,0);assert.equal(returned.room.members.find(m=>m.id===guestToken.memberId).team,order[0]);good(await returned.cmd('pick',{player:'김뿡'}));returned.ws.close();
  await until(()=>host.room.state.picks.filter(Boolean).length===20);assert.equal(host.room.state.picks.filter(p=>p.automatic).length,19);for(const t of order){const roster=host.room.state.picks.filter(p=>p.team===t);assert.equal(roster.filter(p=>players.find(x=>x.id===p.player).role==='damage').length,2);assert.equal(roster.filter(p=>players.find(x=>x.id===p.player).role==='support').length,2)}good(await host.cmd('confirm'));
@@ -118,7 +137,7 @@ test('User ranking is shared and last team pick never claims a future turn',()=>
 
 test('Fresh opening preferences differ by captain rather than forcing one chain',()=>{
  const opening=team=>chooseDraftPlayer({order:[team,...initialOrder.filter(t=>t!==team)],picks:[],coachMode:false},team).player.id;
- assert.equal(opening('룩삼'),'뱅');assert.equal(opening('콩콩'),'김뿡');assert.equal(opening('둥그레'),'남봉');
+ assert.equal(opening('룩삼'),'뱅');assert.equal(opening('콩콩'),'김뿡');assert.equal(opening('둥그레'),'큐베');
 });
 test('No pick reason is generated',()=>{
  const s={order:initialOrder,picks:[],coachMode:false};

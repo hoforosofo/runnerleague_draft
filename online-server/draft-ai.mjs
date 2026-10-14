@@ -1,7 +1,7 @@
 import {players,eligible,teamAt} from './model.mjs';
 import {WOLF_PROFILES,adjustment} from './draft-evidence.mjs';
 export {EVIDENCE_AS_OF} from './draft-evidence.mjs';
-export const POLICY_VERSION='runnerleague-wolf-community-v7';
+export const POLICY_VERSION='runnerleague-community-v8';
 const byId=new Map(players.map(p=>[p.id,p]));
 const profiles=Object.fromEntries(Object.entries(WOLF_PROFILES).map(([id,p])=>[id,Object.freeze({...p,value:p.value*.85+p.prior*.15+adjustment(id)})]));
 const tankNeeds={
@@ -14,6 +14,12 @@ const rosterOf=(picks,team)=>picks.filter(p=>p.team===team).map(p=>byId.get(p.pl
 const mainFit=p=>profile(p).style==='main'?1:profile(p).style==='flex'?.9:.5;
 const subFit=p=>profile(p).style==='sub'?1:profile(p).style==='flex'?.9:.55;
 const preference=(team,id)=>{
+ const recent=adjustment(team+'+'+id);
+ if(team==='둥그레'&&['큐베','아야츠노 유니'].includes(id))return recent*3;
+ if(team==='푸린'&&id==='디디디용')return recent*3;
+ if(team==='푸린'&&['마뫄','양아지'].includes(id))return recent;
+ if(team==='룩삼'&&id==='임나은')return recent;
+ if(team==='울프'&&id==='마뫄')return recent;
  if(team==='룩삼'&&id==='뱅')return 7;
  if(team==='콩콩'&&id==='김뿡')return 4;
  if(team==='푸린'&&id==='눈꽃')return adjustment('푸린+눈꽃');
@@ -30,7 +36,7 @@ export function evaluateDraftTeam(picks,team){
  score+=Math.min(18,leader*need.order*1.6);
  if(d.length===2){
   score+=Math.max(mainFit(d[0])+subFit(d[1]),mainFit(d[1])+subFit(d[0]))*6;
-  if(d.every(p=>profile(p).value<76))score-=28;
+  if(d.every(p=>profile(p).value<76))score-=54;
   const heroUnion=new Set(d.flatMap(p=>profile(p).heroes));
   if(heroUnion.size<3)score-=7; // One shared comfort pick is vulnerable to bans.
  }
@@ -44,6 +50,7 @@ export function evaluateDraftTeam(picks,team){
   const mercy=h.find(p=>p.id==='삐부'||p.id==='담유이');
   if(mercy&&d.some(p=>mainFit(p)>=.9&&profile(p).carry>=8))score+=adjustment(mercy.id+'+멘딜')+4;
   if(h.some(p=>p.id==='남봉')&&d.some(p=>p.id==='큐베'))score+=adjustment('큐베+남봉');
+  if(h.some(p=>p.id==='아야츠노 유니')&&h.some(p=>p.id==='삐부'))score+=adjustment('유니+삐부');
  }
  // A clearer caller is particularly useful to a mechanically strong tank.
  if(team==='둥그레'&&h.some(p=>p.id==='남봉'))score+=9;
@@ -130,7 +137,9 @@ export function rankDraftCandidates(state,team){
    const slots=[...state.picks];slots[index]={player:player.id,team};
    const working={...state,picks:slots},selected=slots.filter(Boolean);
    const second=candidates(working,team,selected);
-   if(second.length)score=Math.max(...second.map(p=>scoreChoice(p,working,index+1,selected)))+marginal(state,team,picks,player)*.02;
+   if(second.length)score=Math.max(...second.map(p=>
+    scoreChoice(p,working,index+1,selected)-marginal(working,team,selected,p)*.1+
+    marginal(working,team,selected,p)*.08+marginal(state,team,picks,player)*.12));
   }
   return {player,score};
  }).sort((a,b)=>b.score-a.score||players.indexOf(a.player)-players.indexOf(b.player));

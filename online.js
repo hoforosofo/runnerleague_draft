@@ -1,8 +1,14 @@
-import {ONLINE_SERVER_URL} from './online-config.js';
+import {ONLINE_SERVER_URL} from './online-config.js?v=cloudflare-v1';
 import {initialOrder,players} from './model.mjs?v=unlimited-room-1';
 const $=s=>document.querySelector(s);
 const el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node};
 let room=null,credentials=null,socket=null,connected=false,apply=()=>{},notify=()=>{},pending=false,retry=null,readOrder=()=>[...initialOrder];
+// Clear the old Render override when installing the Cloudflare client.
+if(!sessionStorage.getItem('runnerleague.cf-config-1')){
+ const old=localStorage.getItem('runnerleague.server-url');
+ if(old&&/\.onrender\.com(?::\d+)?\/?$/.test(old))localStorage.removeItem('runnerleague.server-url');
+ sessionStorage.setItem('runnerleague.cf-config-1','1');
+}
 const endpoint=()=>localStorage.getItem('runnerleague.server-url')||ONLINE_SERVER_URL.trim()||'';
 const sessionKey=code=>`runnerleague.online.${code}`;
 const recoveryKey=code=>`${sessionKey(code)}.${endpoint()}`;
@@ -10,6 +16,7 @@ const recover=code=>JSON.parse(sessionStorage.getItem(sessionKey(code))||localSt
 const mine=()=>room?.members.find(m=>m.id===credentials?.memberId);
 const isHost=()=>mine()?.id===room?.hostId;
 let warmingAt=0;
+setInterval(()=>{if(socket?.readyState===WebSocket.OPEN)socket.send('ping')},20000);
 function warmServer(){const base=endpoint().replace(/\/$/,'');if(!base||Date.now()-warmingAt<30000)return;warmingAt=Date.now();fetch(base+'/health',{cache:'no-store',signal:AbortSignal.timeout(70000)}).catch(()=>{})}
 let connectionNoticeTimer;
 function connecting(stage){let dialog=$('#online-connecting');if(!dialog){dialog=el('dialog');dialog.id='online-connecting';dialog.innerHTML='<div class="connection-progress"><span class="connection-spinner" aria-hidden="true"></span><span role="status" id="connection-stage"></span></div><p id="connection-hint">서버 응답을 기다리고 있습니다.</p>';document.body.append(dialog)}$('#connection-stage').textContent=stage;$('#connection-hint').textContent='서버 응답을 기다리고 있습니다.';if(!dialog.open)dialog.showModal();clearTimeout(connectionNoticeTimer);connectionNoticeTimer=setTimeout(()=>{if(dialog.open)$('#connection-hint').textContent='서버 시작이나 네트워크 연결에 시간이 걸리고 있습니다. 잠시 기다려 주세요.'},8000)}
@@ -51,10 +58,10 @@ function action(name,data={}){
  if(pending){notify('이전 요청을 처리 중입니다.');return true}pending=true;socket.send(JSON.stringify({type:'command',action:name,data,revision:room.revision}));return true;
 }
 function connect(){
- clearTimeout(retry);connected=false;const url=new URL(endpoint());url.protocol=url.protocol==='https:'?'wss:':'ws:';url.pathname='/ws';url.search='';socket=new WebSocket(url);
+ clearTimeout(retry);connected=false;const url=new URL(endpoint());url.protocol=url.protocol==='https:'?'wss:':'ws:';url.pathname='/ws';url.search='';url.searchParams.set('code',credentials.code);socket=new WebSocket(url);
  const peer=socket;
  socket.onopen=()=>{if(socket!==peer||!credentials)return;socket.send(JSON.stringify({type:'auth',code:credentials.code,token:credentials.token}));};
- socket.onmessage=e=>{if(socket!==peer)return;const msg=JSON.parse(e.data);if(msg.type==='state'){connectedNotice();const wasStarted=!!room?.state.started;room=msg.room;serverOffset=(room.serverTime||Date.now())-Date.now();connected=true;pending=false;matchmakingBusy=false;apply(room.state);refreshChrome();if(room.state.started&&!wasStarted){$('#online-lobby')?.close()}else if($('#online-lobby')?.open)openLobby()}else if(msg.type==='error'){pending=false;if(msg.message==='재접속 정보가 유효하지 않습니다.'){localStorage.removeItem(recoveryKey(credentials.code));sessionStorage.removeItem(sessionKey(credentials.code));localStorage.removeItem('runnerleague.active-room');sessionStorage.removeItem('runnerleague.active-room');credentials=null;socket.close();room=null;menu()}notify(msg.message);const info=$('#online-status');if(info)info.textContent=msg.message}};
+ socket.onmessage=e=>{if(socket!==peer)return;if(e.data==='pong')return;const msg=JSON.parse(e.data);if(msg.type==='state'){connectedNotice();const wasStarted=!!room?.state.started;room=msg.room;serverOffset=(room.serverTime||Date.now())-Date.now();connected=true;pending=false;matchmakingBusy=false;apply(room.state);refreshChrome();if(room.state.started&&!wasStarted){$('#online-lobby')?.close()}else if($('#online-lobby')?.open)openLobby()}else if(msg.type==='error'){pending=false;if(msg.message==='재접속 정보가 유효하지 않습니다.'){localStorage.removeItem(recoveryKey(credentials.code));sessionStorage.removeItem(sessionKey(credentials.code));localStorage.removeItem('runnerleague.active-room');sessionStorage.removeItem('runnerleague.active-room');credentials=null;socket.close();room=null;menu()}notify(msg.message);const info=$('#online-status');if(info)info.textContent=msg.message}};
  socket.onclose=e=>{if(socket!==peer)return;connected=false;pending=false;refreshChrome();if(e.code===4001){notify('다른 탭에서 같은 참가자로 접속했습니다.');return}if(credentials)retry=setTimeout(connect,1500)};
 }
 async function enter(create,name,code,matchmaking=false){
@@ -85,7 +92,7 @@ function menu(mode='join'){
  }
  dialog.dataset.mode=mode;
  dialog.querySelector('h2').textContent=mode==='match'?'랜덤매칭':mode==='create'?'온라인 방 만들기':mode==='join'?'온라인 방 참가':'러너리그 드래프트';
- dialog.querySelector('h2+p').textContent=mode==='match'?'사용할 팀장을 선택하세요. 5명이 모이면 순위 투표를 시작합니다.':mode==='create'?'시간 제한 없이 팀장들과 선발할 방을 만드세요.':mode==='join'?'초대받은 방 코드를 입력하세요.':'진행 방식을 선택하세요.';
+ dialog.querySelector('h2+p').textContent=mode==='match'?'5명이 모이면 팀장을 무작위로 배정하고 바로 시작합니다.':mode==='create'?'시간 제한 없이 팀장들과 선발할 방을 만드세요.':mode==='join'?'초대받은 방 코드를 입력하세요.':'진행 방식을 선택하세요.';
  $('#online-code').closest('label').hidden=mode==='match'||mode==='create';
  $('#create-settings').hidden=mode==='match'||mode==='join';
  $('#mode-create').hidden=mode==='match'||mode==='join';$('#mode-join').hidden=mode==='match'||mode==='create';$('#mode-solo').textContent=mode==='all'?'혼자 하기':'닫기';
@@ -95,7 +102,7 @@ function openLobby(){
  if(!room)return;let dialog=$('#online-lobby');if(!dialog){dialog=el('dialog');dialog.id='online-lobby';document.body.append(dialog)}dialog.replaceChildren();dialog.append(el('h2',showCode?`온라인 방 · ${room.code}`:'온라인 방'));
  const matching=room.state.matchmaking&&!room.state.started;
  if(matching&&room.state.matchPhase!=='waiting'){renderMatchStage(dialog);if(!dialog.open)dialog.showModal();return;}
- if(matching){dialog.querySelector('h2').textContent=`랜덤매칭 대기 · ${room.members.filter(m=>m.connected).length} / 5명`;const hint=el('p','5명이 모이면 팀장을 무작위로 배정하고 순위 투표를 진행합니다.');const cancel=el('button','매칭 취소','secondary');cancel.id='cancel-match';cancel.onclick=()=>{const code=credentials?.code;credentials=null;clearTimeout(retry);socket?.close();socket=null;connected=false;pending=false;matchmakingBusy=false;room=null;sessionStorage.removeItem('runnerleague.active-room');localStorage.removeItem('runnerleague.active-room');if(code){sessionStorage.removeItem(sessionKey(code));localStorage.removeItem(recoveryKey(code))}const url=new URL(location.href);url.searchParams.delete('room');history.replaceState(null,'',url);dialog.close();refreshChrome();if(previousLocalState)apply(previousLocalState);previousLocalState=null;$('#online-menu')?.close()};dialog.append(hint,cancel);if(!dialog.open)dialog.showModal();return;}
+ if(matching){dialog.querySelector('h2').textContent=`랜덤매칭 대기 · ${room.members.filter(m=>m.connected).length} / 5명`;const hint=el('p','5명이 모이면 팀장을 무작위로 배정하고 고정 순서로 바로 시작합니다.');const cancel=el('button','매칭 취소','secondary');cancel.id='cancel-match';cancel.onclick=()=>{const code=credentials?.code;credentials=null;clearTimeout(retry);socket?.close();socket=null;connected=false;pending=false;matchmakingBusy=false;room=null;sessionStorage.removeItem('runnerleague.active-room');localStorage.removeItem('runnerleague.active-room');if(code){sessionStorage.removeItem(sessionKey(code));localStorage.removeItem(recoveryKey(code))}const url=new URL(location.href);url.searchParams.delete('room');history.replaceState(null,'',url);dialog.close();refreshChrome();if(previousLocalState)apply(previousLocalState);previousLocalState=null;$('#online-menu')?.close()};dialog.append(hint,cancel);if(!dialog.open)dialog.showModal();return;}
  const copy=el('button','초대 링크 복사','secondary');copy.onclick=async()=>{const url=new URL(location.href);url.searchParams.set('room',room.code);try{await navigator.clipboard.writeText(url.href);copy.textContent='복사되었습니다'}catch{notify(url.href)}};dialog.append(copy);
  const waiting=room.members.find(m=>!m.team&&!m.spectator),me=mine();dialog.append(el('p',room.state.started?'드래프트가 시작되었습니다.':waiting?`${waiting.name}님이 팀장 캐릭터를 선택할 차례입니다.`:'팀 선택이 완료되었습니다. 방장이 시작할 수 있습니다.'));
  const members=el('div',undefined,'online-members');for(const m of room.members){const row=el('div',undefined,'online-member');row.append(el('strong',`${m.name}${m.id===room.hostId?' · 방장':''}`),el('span',`${m.team||(m.spectator?'관전':'미선택')} · ${m.connected?'접속 중':room.state.autoPick?'연결 끊김 · 자동 선발 대기':'연결 끊김'}`));if(isHost()&&!room.state.started&&m.id!==me.id){const release=el('button','자리 비우기','text-btn');release.onclick=()=>action('release',{memberId:m.id});row.append(release)}members.append(row)}if(room.state.autoPick)for(const team of room.state.order)if(!room.members.some(m=>m.team===team)){const row=el('div',undefined,'online-member');row.append(el('strong',`${team} 팀`),el('span','팀장 없음 · 자동 선발'));members.append(row)}dialog.append(members);
