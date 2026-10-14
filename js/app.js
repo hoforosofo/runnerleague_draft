@@ -1,7 +1,7 @@
-import {online} from './online.js?v=presence-v14';
+import {online} from './online.js?v=presence-kick-v15';
 import './touch-drag.js';
-import './button-icons.js?v=presence-v14';
-import {players,roles,caps,initialOrder,teamAt,eligible} from '../shared/model.mjs?v=presence-v14';
+import './button-icons.js?v=presence-kick-v15';
+import {players,roles,caps,initialOrder,teamAt,eligible} from '../shared/model.mjs?v=presence-kick-v15';
 const $=s=>document.querySelector(s),byId=id=>players.find(p=>p.id===id),displayRole=p=>p.name==='미정'?'미정':roles[p.role];
 let order=[...initialOrder],picks=[],started=false,coachMode=false,filter='all',coaches={},pendingAction=null,selectedCoachTeam=null;
 let tanks=Object.fromEntries(initialOrder.map(team=>[team,team]));

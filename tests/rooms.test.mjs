@@ -164,3 +164,15 @@ test('Unrecovered host network loss ends the room after the reconnect grace',asy
   await until(()=>closed,35000);await post(mf,`/rooms/${c.code}/join`,{},404);
  }finally{await mf.dispose();}
 });
+
+test('Only the host may kick; kicked tokens and browsers cannot rejoin this room',async()=>{
+ const mf=new Miniflare(options);try{
+  const c=await post(mf,'/rooms',{autoPick:false}),host=await client(mf,c),deviceId=crypto.randomUUID(),g=await post(mf,`/rooms/${c.code}/join`,{deviceId}),guest=await client(mf,g);
+  await until(()=>host.room.members.length===2);denied(await guest.cmd('kick',{memberId:c.memberId}));denied(await host.cmd('kick',{memberId:c.memberId}));
+  let kicked=false;guest.ws.addEventListener('message',e=>{if(JSON.parse(e.data).type==='kicked')kicked=true;});await pause(30);good(await host.cmd('kick',{memberId:g.memberId}));await until(()=>kicked&&host.room.members.length===1);
+  await post(mf,`/rooms/${c.code}/join`,{token:g.token},403);await post(mf,`/rooms/${c.code}/join`,{deviceId},403);
+  assert.ok(host.room.members.every(m=>!('tokenHash' in m)&&!('deviceIdHash' in m)));assert.ok(!('bans' in host.room));
+  await mf.unsafeEvictDurableObject('runnerleague-test','DraftRoom',{name:c.code,webSockets:'hibernate'});await host.pong();await post(mf,`/rooms/${c.code}/join`,{deviceId},403);
+  const other=await post(mf,'/rooms');await post(mf,`/rooms/${other.code}/join`,{deviceId});
+ }finally{await mf.dispose();}
+});
