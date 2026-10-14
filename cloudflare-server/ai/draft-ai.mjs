@@ -1,7 +1,7 @@
 import {players,eligible,teamAt} from '../../shared/model.mjs';
 import {WOLF_PROFILES,adjustment} from './draft-evidence.mjs';
 export {EVIDENCE_AS_OF} from './draft-evidence.mjs';
-export const POLICY_VERSION='runnerleague-community-v8';
+export const POLICY_VERSION='runnerleague-community-v10';
 const byId=new Map(players.map(p=>[p.id,p]));
 const profiles=Object.fromEntries(Object.entries(WOLF_PROFILES).map(([id,p])=>[id,Object.freeze({...p,value:p.value*.85+p.prior*.15+adjustment(id)})]));
 const tankNeeds={
@@ -18,11 +18,11 @@ const preference=(team,id)=>{
  if(team==='둥그레'&&['큐베','아야츠노 유니'].includes(id))return recent*3;
  if(team==='푸린'&&id==='디디디용')return recent*3;
  if(team==='푸린'&&['마뫄','양아지'].includes(id))return recent;
- if(team==='룩삼'&&id==='임나은')return recent;
+ if(team==='룩삼'&&['임나은','인섹'].includes(id))return recent*3;
  if(team==='울프'&&id==='마뫄')return recent;
  if(team==='룩삼'&&id==='뱅')return 7;
  if(team==='콩콩'&&id==='김뿡')return 4;
- if(team==='푸린'&&id==='눈꽃')return adjustment('푸린+눈꽃');
+ if(team==='푸린'&&id==='눈꽃')return recent*3;
  if(team==='콩콩'&&id==='눈꽃')return adjustment('콩콩+눈꽃');
  if(team==='콩콩'&&id==='서넹')return adjustment('콩콩+서넹');
  if(team==='울프'&&id==='디디디용')return adjustment('울프+디디디용');
@@ -37,6 +37,8 @@ export function evaluateDraftTeam(picks,team){
  if(d.length===2){
   score+=Math.max(mainFit(d[0])+subFit(d[1]),mainFit(d[1])+subFit(d[0]))*6;
   if(d.every(p=>profile(p).value<76))score-=54;
+  // Latest discussion identifies this exact pair as a risk, not every lower-tier pair.
+  if(d.some(p=>p.id==='뀨냥냥')&&d.some(p=>p.id==='꼴랑이'))score-=16;
   const heroUnion=new Set(d.flatMap(p=>profile(p).heroes));
   if(heroUnion.size<3)score-=7; // One shared comfort pick is vulnerable to bans.
  }
@@ -91,14 +93,13 @@ function projection(state,team,index,player,scenario){
  const picks=slots.filter(Boolean),own=evaluateDraftTeam(picks,team),rivals=state.order.filter(t=>t!==team).map(t=>evaluateDraftTeam(picks,t));
  return own-Math.max(...rivals)*.22;
 }
+// Opening market tiers stay stable; captain taste only breaks the top-pair tie.
+// These are draft priorities, not a universal player skill ranking.
 function openingScore(state,team,picks,p){
- const q=profile(p),need=tankNeeds[team]||{order:1};
- let score=q.value+preference(team,p.id);
- if(p.role==='damage')score+=20;
- else score+=q.order*need.order*1.1;
- if(team==='둥그레'&&p.id==='남봉')score+=7;
- if(team==='푸린'&&p.role==='damage'&&!['김뿡','뱅','큐베'].includes(p.id))score-=adjustment('푸린 상위딜');
- return score;
+ const tiers=[['김뿡','뱅'],['큐베'],['디디디용']];
+ const tier=tiers.findIndex(ids=>ids.includes(p.id));
+ if(tier>=0)return 1000-tier*100+(p.id==='뱅'&&team==='룩삼'?2:0)+(p.id==='김뿡'&&team==='콩콩'?2:0);
+ return profile(p).value+preference(team,p.id);
 }
 export function rankDraftCandidates(state,team){
  if(!state.order?.includes(team)||!Array.isArray(state.picks))return [];
@@ -117,6 +118,7 @@ export function rankDraftCandidates(state,team){
  }
  const firstFour=state.picks.slice(0,4).filter(Boolean);
  const topPair=firstFour.length===4&&firstFour.filter(p=>['양아지','남봉'].includes(p.player)).length===2;
+ const standardOpening=index>=4&&index<=5&&team==='울프'&&firstFour.length===4&&['김뿡','뱅','큐베','디디디용'].every(id=>firstFour.some(p=>p.player===id));
  function scoreChoice(player,working=state,at=index,selected=picks){
   const topHealer=candidates(working,team,selected).some(p=>['양아지','남봉','아야츠노 유니','인섹','눈꽃'].includes(p.id));
   const forecasts=[0,1,2].map(s=>projection(working,team,at,player,s)),mean=forecasts.reduce((a,b)=>a+b,0)/3;
@@ -128,6 +130,10 @@ export function rankDraftCandidates(state,team){
    const other=legal.filter(p=>p.role==='damage'&&p.id!==player.id&&profile(p).value>=76);
    const roster=rosterOf(selected,team);
    if((roster.length===0&&other.length)||roster.some(p=>p.role==='damage'&&profile(p).value>=76))score+=adjustment('울프 더블딜')*2;
+  }
+  if(standardOpening){
+   const ids=[...selected.filter(p=>p.team===team).map(p=>p.player),player.id];
+   if(ids.length===2&&ids.includes('양아지')&&(ids.includes('남봉')||ids.includes('마뫄')))score+=24;
   }
   return score;
  }

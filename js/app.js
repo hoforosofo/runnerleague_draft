@@ -1,7 +1,7 @@
-import {online} from './online.js?v=results-ui-v3';
+import {online} from './online.js?v=integrated-v10';
 import './touch-drag.js';
-import './button-icons.js?v=results-ui-v3';
-import {players,roles,caps,initialOrder,teamAt,eligible} from '../shared/model.mjs?v=results-ui-v3';
+import './button-icons.js?v=integrated-v10';
+import {players,roles,caps,initialOrder,teamAt,eligible} from '../shared/model.mjs?v=integrated-v10';
 const $=s=>document.querySelector(s),byId=id=>players.find(p=>p.id===id),displayRole=p=>p.name==='미정'?'미정':roles[p.role];
 let order=[...initialOrder],picks=[],started=false,coachMode=false,filter='all',coaches={},pendingAction=null,selectedCoachTeam=null;
 let tanks=Object.fromEntries(initialOrder.map(team=>[team,team]));
@@ -103,41 +103,57 @@ function renderResults(){
  if(!complete||!resultsConfirmed)return;
  screen.classList.toggle('vertical-view',resultView==='vertical');
  screen.classList.toggle('order-view',resultView==='order');
- screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>팀 구성과 실제 선발 순서를 확인하세요.</p></div><div class="results-actions"><button class="secondary" id="save-result-draft">임시저장</button><button class="secondary" id="load-result-draft">불러오기</button><div class="view-switch" aria-label="팀 구성 보기"><button class="secondary" data-view="horizontal" aria-pressed="${resultView==='horizontal'}">가로 보기</button><button class="secondary" data-view="vertical" aria-pressed="${resultView==='vertical'}">세로 보기</button><button class="secondary" data-view="order" aria-pressed="${resultView==='order'}">순서대로 보기</button></div><button class="primary" id="save-results">결과 이미지 저장</button><button class="primary" id="save-snake-results">드래프트 순서 이미지 저장</button><button class="secondary" id="edit-draft">수정하기</button><button class="primary" id="restart-draft">드래프트 다시하기</button></div></div><div class="results-grid">${order.map((team,i)=>{
+ screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>팀 구성과 실제 선발 순서를 확인하세요.</p></div><div class="results-actions"><button class="secondary" id="save-result-draft">임시저장</button><button class="secondary" id="load-result-draft">불러오기</button><div class="view-switch" aria-label="팀 구성 보기"><button class="secondary" data-view="horizontal" aria-pressed="${resultView==='horizontal'}">가로 보기</button><button class="secondary" data-view="vertical" aria-pressed="${resultView==='vertical'}">세로 보기</button><button class="secondary" data-view="order" aria-pressed="${resultView==='order'}">순서대로 보기</button></div><button class="primary" id="save-results">결과 이미지 저장</button><button class="primary" id="save-snake-results">드래프트 순서 이미지 저장</button><button class="secondary" id="edit-draft">수정하기</button><button class="primary" id="restart-draft">드래프트 다시하기</button></div></div><div class="snake-image-view" ${resultView==='order'?'':'hidden'}><img id="snake-result-image" alt="팀별·라운드별 드래프트 선발 순서"><p id="snake-image-status" role="status">순서 이미지 준비 중…</p></div><div class="results-grid" ${resultView==='order'?'hidden':''}>${order.map((team,i)=>{
  const roster=chosen().filter(p=>p.team===team).map(p=>byId(p.player));
 
  return `<article class="result-team" style="--team-color:${colors[i]}" aria-label="${tanks[team]} 팀"><div class="result-team-title"><h2>${tanks[team]} 팀</h2></div><div class="result-roster">${(coachMode?['tank','damage','support','coach']:['tank','damage','support']).map(role=>{const list=role==='tank'?[byId(tanks[team])]:sortRoster(roster.filter(p=>p.role===role));return `<div class="result-role"><span>${roles[role]}</span><div>${list.map(p=>role==='tank'?`<div class="result-member"><div class="result-portrait result-tank">${avatar(p)}</div><span class="result-member-meta"><strong>${p.name}</strong><small>${roles[p.role]}</small></span></div>`:`<div class="result-member"><div class="result-portrait">${avatar(p)}</div><span class="result-member-meta"><strong>${p.name}</strong><small>${roles[p.role]}</small></span></div>`).join('')}</div></div>`}).join('')}</div></article>`
  }).join('')}</div>`;
  document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{resultView=b.dataset.view;renderResults();bindRemovals();onlinePermissions();renderMobileOverview()});
- // 순서 보기에서도 선수는 표시만 하고 선택/이동할 수 없습니다.
- const sequence=document.createElement('div');sequence.className='result-pick-order';
- sequence.innerHTML=Array.from({length:total()},(_,index)=>{
-  const entry=picks[index],player=entry&&byId(entry.player);
-  return `<article class="result-pick-card"><span class="sequence-number">${index+1}</span><div class="result-order-portrait">${player?avatar(player):''}</div><strong>${entry?.team||turnOwners[index]} 팀</strong></article>`;
- }).join('');screen.append(sequence);
+ if(resultView==='order')showSnakeImage();
  $('#save-result-draft').onclick=saveDraft;$('#load-result-draft').onclick=openSavedDrafts;
  $('#save-results').onclick=downloadResultsImage;$('#save-snake-results').onclick=downloadSnakeImage;
  $('#edit-draft').onclick=()=>{if(online.action('edit'))return;resultsConfirmed=false;completionPrompted=true;render();window.scrollTo(0,0)};
  $('#restart-draft').onclick=()=>{reset(true);window.scrollTo(0,0)};
 }
-async function downloadSnakeImage(){
- const button=$('#save-snake-results');if(button.disabled)return;button.disabled=true;button.textContent='저장 중…';
- try{
+// Screen preview and PNG download share the original snake image renderer.
+async function renderSnakeImage(){
   await document.fonts.ready;
   const canvas=document.createElement('canvas');canvas.width=1600;canvas.height=960;
   const ctx=canvas.getContext('2d');ctx.fillStyle='#f3f6fb';ctx.fillRect(0,0,1600,960);
   const text=(value,x,y,size=18,color='#17243b')=>{ctx.font=`650 ${size}px League, sans-serif`;ctx.fillStyle=color;ctx.fillText(value,x,y)};
   const portrait=async(p,x,y,w,h)=>{if(!p)return;const img=new Image();img.src=p.image;await img.decode();const scale=Math.min(w/img.naturalWidth,h/img.naturalHeight);ctx.drawImage(img,x+(w-img.naturalWidth*scale)/2,y+(h-img.naturalHeight*scale)/2,img.naturalWidth*scale,img.naturalHeight*scale)};
   text('RUNNER LEAGUE / SNAKE DRAFT',32,36,16,'#2463eb');text('스네이크 드래프트 · 선발 순서',32,82,32);
-  // 결과 화면과 같은 실제 1~20번 선발 순서로 저장합니다.
-  for(let index=0;index<total();index++){
-   const x=32+(index%5)*310,y=110+Math.floor(index/5)*207;
-   ctx.fillStyle='#fff';ctx.beginPath();ctx.roundRect(x,y,296,193,12);ctx.fill();
-   text(String(index+1),x+14,y+25,18,'#2463eb');
-   const entry=picks[index];
-   if(entry){await portrait(byId(entry.player),x+68,y+28,160,120);text(entry.team+' 팀',x+105,y+175,16);}
+  const rounds=total()/5,cellWidth=1308/rounds;
+  for(let round=0;round<rounds;round++)text(`${round+1}라운드`,230+round*cellWidth,122,17,'#7b889d');
+  for(const [i,team] of order.entries()){
+   const y=145+i*155;ctx.fillStyle='#fff';ctx.beginPath();ctx.roundRect(32,y,1536,144,12);ctx.fill();
+   text(`${i+1} · ${team} 팀`,48,y+23,17);await portrait(byId(team),62,y+33,110,102);
+   const indices=turnOwners.map((owner,index)=>owner===team?index:-1).filter(index=>index>=0);
+   for(const [round,index] of indices.entries()){
+    const x=218+round*cellWidth,entry=picks[index];
+    ctx.strokeStyle='#dce5f2';ctx.strokeRect(x,y+8,cellWidth-14,128);
+    text(`${String(index+1).padStart(2,'0')}번`,x+10,y+29,17,'#2463eb');
+    if(entry)await portrait(byId(entry.player),x+8,y+35,cellWidth-30,95);else text('미선발',x+30,y+85,16,'#7b889d');
+   }
   }
   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('PNG 생성 실패');
+  return blob;
+}
+let snakePreviewUrl=null;
+async function showSnakeImage(){
+ const image=$('#snake-result-image'),status=$('#snake-image-status');
+ try{
+  const blob=await renderSnakeImage();
+  // A room update or view switch may replace this image while rendering.
+  if(!image.isConnected)return;
+  if(snakePreviewUrl)URL.revokeObjectURL(snakePreviewUrl);
+  snakePreviewUrl=URL.createObjectURL(blob);image.src=snakePreviewUrl;status.hidden=true;
+ }catch(error){if(status.isConnected)status.textContent='이미지를 불러오지 못했습니다. 순서 보기를 다시 눌러주세요.';console.error(error)}
+}
+async function downloadSnakeImage(){
+ const button=$('#save-snake-results');if(button.disabled)return;button.disabled=true;button.textContent='저장 중…';
+ try{
+  const blob=await renderSnakeImage();
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='runnerleague_snake_draft.png';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
  }catch(error){toast('드래프트 순서 이미지 저장에 실패했습니다.');console.error(error)}finally{button.disabled=false;button.textContent='드래프트 순서 이미지 저장'}
 }

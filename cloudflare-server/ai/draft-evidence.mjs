@@ -1,5 +1,5 @@
 // Curated supplied evidence. Numeric values are policy judgments, not match statistics.
-export const EVIDENCE_AS_OF='2026-10-14T19:01:00+09:00';
+export const EVIDENCE_AS_OF='2026-10-15T01:57:00+09:00';
 export const HALF_LIFE_HOURS=12;
 export const WOLF_PROFILES={
   "김뿡": {
@@ -762,7 +762,61 @@ signals.push(...[
     "reliability": 0.75,
     "event": "oct14-cuve-role",
     "note": "사이드 섭딜 영향력 평가. 메인딜 DPS 동급 발언은 상황 제한"
-  }
+  },
+{
+  "source": "https://www.fmkorea.com/10447669720",
+  "at": "2026-10-15T01:35:00+09:00",
+  "key": "룩삼+인섹",
+  "delta": 6,
+  "reliability": 0.8,
+  "event": "oct15-look-support",
+  "note": "팀장 발언을 옮긴 글: 인섹·임나은 선호"
+},
+{
+  "source": "https://www.fmkorea.com/10447669720",
+  "at": "2026-10-15T01:35:00+09:00",
+  "key": "룩삼+임나은",
+  "delta": 6,
+  "reliability": 0.8,
+  "event": "oct15-look-support",
+  "note": "같은 팀장 발언; 선호를 실력 평가로 환산하지 않음"
+},
+{
+  "source": "https://www.fmkorea.com/10447670220",
+  "at": "2026-10-15T01:35:00+09:00",
+  "key": "푸린+눈꽃",
+  "delta": 6,
+  "reliability": 0.5,
+  "event": "oct15-purin-support",
+  "note": "디디디용 선발 후 눈꽃 확보 전망; 조건부 커뮤니티 추정"
+},
+{
+  "source": "https://www.fmkorea.com/10447684505",
+  "at": "2026-10-15T01:45:00+09:00",
+  "key": "둥그레+아야츠노 유니",
+  "delta": 6,
+  "reliability": 0.6,
+  "event": "oct15-dung-uni",
+  "note": "큐베·유니 조합 선호에 대한 최신 반응"
+},
+{
+  "source": "https://www.fmkorea.com/10447698379",
+  "at": "2026-10-15T01:55:00+09:00",
+  "key": "큐베",
+  "delta": 4,
+  "reliability": 0.55,
+  "event": "oct15-cuve-flex",
+  "note": "벤데타 외 섭딜 수행 긍정 관측; 경기 통계는 아님"
+},
+{
+  "source": "https://www.fmkorea.com/10447656885",
+  "at": "2026-10-15T01:26:00+09:00",
+  "key": "양아지",
+  "delta": 3,
+  "reliability": 0.35,
+  "event": "oct15-yang-zen",
+  "note": "젠야타 수행 단일 관측; 과도한 가치 상승 제한"
+}
 ]);
 export function evidenceWeight(at,reliability=1,asOf=EVIDENCE_AS_OF){
  const age=(Date.parse(asOf)-Date.parse(at))/3600000;
