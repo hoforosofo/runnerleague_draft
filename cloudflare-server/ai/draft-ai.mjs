@@ -1,7 +1,8 @@
 import {players,eligible,teamAt} from '../../shared/model.mjs';
+import {branchPreference} from './draft-branches.mjs';
 import {WOLF_PROFILES,adjustment} from './draft-evidence.mjs';
 export {EVIDENCE_AS_OF} from './draft-evidence.mjs';
-export const POLICY_VERSION='runnerleague-community-v10';
+export const POLICY_VERSION='runnerleague-community-v13';
 const byId=new Map(players.map(p=>[p.id,p]));
 const profiles=Object.fromEntries(Object.entries(WOLF_PROFILES).map(([id,p])=>[id,Object.freeze({...p,value:p.value*.85+p.prior*.15+adjustment(id)})]));
 const tankNeeds={
@@ -50,9 +51,9 @@ export function evaluateDraftTeam(picks,team){
   const supply=a.care+b.care, demand=need.heal+d.reduce((sum,p)=>sum+profile(p).resource,0);
   score-=Math.max(0,demand-supply)*2;
   const mercy=h.find(p=>p.id==='삐부'||p.id==='담유이');
-  if(mercy&&d.some(p=>mainFit(p)>=.9&&profile(p).carry>=8))score+=adjustment(mercy.id+'+멘딜')+4;
+  if(mercy&&d.some(p=>mainFit(p)>=.9&&profile(p).carry>=8))score+=(adjustment(mercy.id+'+멘딜')+4)*.35;
   if(h.some(p=>p.id==='남봉')&&d.some(p=>p.id==='큐베'))score+=adjustment('큐베+남봉');
-  if(h.some(p=>p.id==='아야츠노 유니')&&h.some(p=>p.id==='삐부'))score+=adjustment('유니+삐부');
+  if(h.some(p=>p.id==='아야츠노 유니')&&h.some(p=>p.id==='삐부'))score+=adjustment('유니+삐부')*.35;
  }
  // A clearer caller is particularly useful to a mechanically strong tank.
  if(team==='둥그레'&&h.some(p=>p.id==='남봉'))score+=9;
@@ -72,7 +73,7 @@ function marginal(state,team,picks,p,scenario=0){
   if(!h.length)score+=5;
   if(scenario===2)score+=profile(p).order*(tankNeeds[team]?.order||0);
  }
- return score;
+ return score+branchPreference(state,team,picks,p);
 }
 function greedy(state,team,picks,scenario){
  return candidates(state,team,picks).map(p=>({p,score:marginal(state,team,picks,p,scenario)}))
@@ -124,6 +125,8 @@ export function rankDraftCandidates(state,team){
   const forecasts=[0,1,2].map(s=>projection(working,team,at,player,s)),mean=forecasts.reduce((a,b)=>a+b,0)/3;
   let score=Math.min(...forecasts)*.6+mean*.4+marginal(working,team,selected,player)*.1;
   if(player.role==='damage'&&profile(player).value<76&&topHealer)score-=14;
+  // Preserve later Mercy synergy without spending an early pick over upper healers.
+  if(player.id==='삐부'&&at<12&&candidates(working,team,selected).some(p=>['양아지','남봉','눈꽃','아야츠노 유니','인섹','임나은'].includes(p.id)))score-=18;
   // Latest Wolf statement is conditional on losing both elite supports.
   // Reward a strong complementary damage pair only when it is still possible.
   if(team==='울프'&&at<=5&&topPair&&player.role==='damage'&&profile(player).value>=76){
@@ -135,7 +138,7 @@ export function rankDraftCandidates(state,team){
    const ids=[...selected.filter(p=>p.team===team).map(p=>p.player),player.id];
    if(ids.length===2&&ids.includes('양아지')&&(ids.includes('남봉')||ids.includes('마뫄')))score+=24;
   }
-  return score;
+  return score+branchPreference(state,team,selected,player);
  }
  return legal.map(player=>{
   let score=scoreChoice(player);
@@ -145,7 +148,7 @@ export function rankDraftCandidates(state,team){
    const second=candidates(working,team,selected);
    if(second.length)score=Math.max(...second.map(p=>
     scoreChoice(p,working,index+1,selected)-marginal(working,team,selected,p)*.1+
-    marginal(working,team,selected,p)*.08+marginal(state,team,picks,player)*.12));
+    marginal(working,team,selected,p)*.08+marginal(state,team,picks,player)*.12+branchPreference(state,team,picks,player)));
   }
   return {player,score};
  }).sort((a,b)=>b.score-a.score||players.indexOf(a.player)-players.indexOf(b.player));

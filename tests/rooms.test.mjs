@@ -111,3 +111,29 @@ test('Legacy queue settings are removed while selected captain and picks remain'
  const room={state:{...initial(),matchmaking:true,matchPhase:'waiting',turnLimitMs:30000,turnTimer:{deadline:123},picks:[{player:'김뿡',team:'룩삼'}]},members:[{team:'룩삼',spectator:false},{team:null,spectator:false}]};
  normalizeRoom(room);assert.equal(room.state.matchmaking,undefined);assert.equal(room.state.turnTimer,null);assert.equal(room.members[1].spectator,true);assert.equal(room.members[0].team,'룩삼');assert.equal(room.state.picks[0].player,'김뿡');
 });
+
+test('30 simultaneous clients receive 20 identical picks and final confirmation',async()=>{
+ const mf=new Miniflare(options);try{
+  const {runRoomTest}=await import('../tools/room-test.mjs');
+  // Adapt real Worker WebSocket pairs to the same API as the browser harness.
+  const connected=new Map();
+  const result=await runRoomTest({serverUrl:'http://localhost',count:30,
+   request:(url,init)=>mf.dispatchFetch(url,{...init,headers:{...init?.headers,Origin:origin}}),
+   connect:url=>{
+    const proxy=new EventTarget();proxy.readyState=0;proxy.send=data=>connected.get(proxy).send(data);proxy.close=(...args)=>connected.get(proxy)?.close(...args);
+    mf.dispatchFetch(url.replace(/^ws/,'http'),{headers:{Origin:origin,Upgrade:'websocket'}}).then(r=>{assert.equal(r.status,101);const ws=r.webSocket;ws.accept();connected.set(proxy,ws);ws.addEventListener('message',e=>proxy.dispatchEvent(new MessageEvent('message',{data:e.data})));proxy.readyState=1;});
+    return proxy;
+   }});
+  assert.equal(result.count,30);assert.equal(result.picks,20);assert.equal(result.allClientsSynchronized,true);assert.equal(result.spectatorPermissionChecked,true);
+  console.log('30-client local verification:',JSON.stringify(result));
+ }finally{await mf.dispose();}
+});
+
+test('Room accepts 50 participants and rejects participant 51 without altering members',async()=>{
+ const mf=new Miniflare(options);try{
+  const c=await post(mf,'/rooms',{autoPick:false});
+  for(let i=1;i<50;i++)await post(mf,`/rooms/${c.code}/join`);
+  const denied=await post(mf,`/rooms/${c.code}/join`,{},400);assert.match(denied.error,/가득/);
+  const host=await client(mf,c);assert.equal(host.room.members.length,50);
+ }finally{await mf.dispose();}
+});

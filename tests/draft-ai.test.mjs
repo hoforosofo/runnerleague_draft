@@ -5,7 +5,7 @@ import {evidenceWeight,weightedAdjustment,signals,WOLF_PROFILES} from '../cloudf
 import {players,initialOrder,eligible,teamAt} from '../shared/model.mjs';
 
 test('Latest captain context changes the draft without treating preferences as skill ranks',()=>{
- assert.equal(POLICY_VERSION,'runnerleague-community-v10');
+ assert.equal(POLICY_VERSION,'runnerleague-community-v13');
  const s={order:initialOrder,picks:[{player:'뱅',team:'룩삼'},{player:'김뿡',team:'콩콩'}]};
  assert.equal(chooseDraftPlayer(s,'둥그레').player.id,'큐베');
  s.picks.push({player:'큐베',team:'둥그레'});
@@ -57,7 +57,7 @@ test('Wolf fifth pair is conditional: double damage and damage/support both exis
   const b=chooseDraftPlayer(s,'울프').player;
   return [a,b];
  };
- assert.deepEqual(new Set(pair(['양아지','남봉','눈꽃','아야츠노 유니']).map(p=>p.id)),new Set(['뱅','김뿡']));
+ assert.deepEqual(new Set(pair(['양아지','남봉','아야츠노 유니','인섹']).map(p=>p.id)),new Set(['뱅','김뿡']));
  assert.deepEqual(new Set(pair(['김뿡','뱅','디디디용','마뫄']).map(p=>p.role)),new Set(['damage','support']));
 });
 
@@ -104,4 +104,29 @@ test('Full automatic opening keeps top pair, Cuve, DDD and a plausible Wolf pair
  assert.equal(chooseDraftPlayer(swapped,'콩콩').player.id,'뱅');
  swapped.picks.push({player:'뱅',team:'콩콩'});
  assert.equal(chooseDraftPlayer(swapped,'둥그레').player.id,'큐베');
+});
+
+test('Mercy synergy does not pull Bibu ahead of upper healers in the normal opening',()=>{
+ const s={order:initialOrder,picks:[]};
+ for(let i=0;i<20;i++){const team=teamAt(i,s.order);s.picks.push({player:chooseDraftPlayer(s,team).player.id,team})}
+ const index=id=>s.picks.findIndex(p=>p.player===id);
+ for(const healer of ['양아지','남봉','눈꽃','아야츠노 유니','인섹','임나은'])assert.ok(index('삐부')>index(healer),healer);
+ assert.deepEqual(players.filter(p=>p.role==='damage').map(p=>p.id),['김뿡','뱅','디디디용','큐베','마뫄','엘리','설백','정령왕','뀨냥냥','꼴랑이']);
+});
+
+
+test('Both supplied Wolf branches follow later team preferences and survive a stolen target',()=>{
+ const examples={
+  hh:['뱅','김뿡','큐베','디디디용','양아지','남봉'],
+  dh:['김뿡','뱅','큐베','디디디용','양아지','마뫄']
+ };
+ for(const [branch,opening] of Object.entries(examples)){
+  const s={order:initialOrder,picks:opening.map((player,i)=>({player,team:teamAt(i,initialOrder)}))};
+  const expected=branch==='hh'?['눈꽃','아야츠노 유니','마뫄','인섹','임나은','삐부']:['남봉','아야츠노 유니','눈꽃','인섹','임나은','엘리'];
+  for(const id of expected){const team=teamAt(s.picks.length,s.order),choice=chooseDraftPlayer(s,team);assert.equal(choice.player.id,id,branch);s.picks.push({player:choice.player.id,team});}
+  // A human can take a forecast target. Recommendations must remain eligible and complete.
+  const team=teamAt(s.picks.length,s.order),alternative=players.find(p=>p.id!=='설백'&&eligible(p,team,s.picks,false));s.picks.push({player:alternative.id,team});
+  while(s.picks.length<20){const team=teamAt(s.picks.length,s.order),choice=chooseDraftPlayer(s,team);assert.ok(eligible(choice.player,team,s.picks,false));s.picks.push({player:choice.player.id,team});}
+  assert.equal(new Set(s.picks.map(p=>p.player)).size,20);
+ }
 });
