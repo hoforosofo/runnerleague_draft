@@ -33,8 +33,13 @@ function member(r,value){return r.members.find(m=>m.tokenHash===sha(String(value
 function requireHost(r,m){if(m.id!==r.hostId)throw Error('방장만 실행할 수 있습니다.')}
 function leaveRoom(r,m){
  if(!r.members.some(p=>p.id===m.id))return;
+ // The original host owns the room lifecycle; never transfer ownership.
+ if(r.hostId===m.id){
+  const message=JSON.stringify({type:'room-closed',message:'방장이 방을 나가 방이 종료되었습니다. 오프라인으로 전환합니다.'});
+  for(const [id,socket] of r.sockets){try{if(id!==m.id)socket.send(message);socket.close(4004,'host-left')}catch{}}
+  r.sockets.clear();r.members=[];r.hostId=null;r.deleted=true;commit(r);return;
+ }
  const ws=r.sockets.get(m.id);r.sockets.delete(m.id);r.members=r.members.filter(p=>p.id!==m.id);
- if(r.hostId===m.id)r.hostId=(r.members.find(p=>r.sockets.has(p.id))||r.members[0])?.id||null;
  if(!r.members.length)r.deleted=true;
  commit(r);ws?.close(1000,'left');
 }

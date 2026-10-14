@@ -137,3 +137,30 @@ test('Room accepts 50 participants and rejects participant 51 without altering m
   const host=await client(mf,c);assert.equal(host.room.members.length,50);
  }finally{await mf.dispose();}
 });
+
+test('Original host departure closes the room and notifies every remaining socket',async()=>{
+ for(const method of ['leave','tab-close']){
+  const mf=new Miniflare(options);try{
+   const c=await post(mf,'/rooms',{autoPick:false}),host=await client(mf,c),guest=await client(mf,await post(mf,`/rooms/${c.code}/join`));
+   let notice;guest.ws.addEventListener('message',e=>{const msg=JSON.parse(e.data);if(msg.type==='room-closed')notice=msg;});
+   if(method==='leave')await post(mf,`/rooms/${c.code}/leave`,{token:c.token},200);else host.ws.close(1000,'site-left');
+   await until(()=>notice);assert.match(notice.message,/방장이/);await post(mf,`/rooms/${c.code}/join`,{},404);
+  }finally{await mf.dispose();}
+ }
+});
+
+test('Non-host leave keeps the original host and room alive',async()=>{
+ const mf=new Miniflare(options);try{
+  const c=await post(mf,'/rooms',{autoPick:false}),host=await client(mf,c),g=await post(mf,`/rooms/${c.code}/join`),guest=await client(mf,g);
+  await post(mf,`/rooms/${c.code}/leave`,{token:g.token},200);await until(()=>host.room.members.length===1);assert.equal(host.room.hostId,c.memberId);
+  await post(mf,`/rooms/${c.code}/join`);
+ }finally{await mf.dispose();}
+});
+
+test('Unrecovered host network loss ends the room after the reconnect grace',async()=>{
+ const mf=new Miniflare(options);try{
+  const c=await post(mf,'/rooms',{autoPick:false}),host=await client(mf,c),guest=await client(mf,await post(mf,`/rooms/${c.code}/join`));let closed=false;
+  guest.ws.addEventListener('message',e=>{if(JSON.parse(e.data).type==='room-closed')closed=true;});host.ws.close(4000,'network-loss');await pause(100);assert.equal(closed,false);
+  await until(()=>closed,35000);await post(mf,`/rooms/${c.code}/join`,{},404);
+ }finally{await mf.dispose();}
+});

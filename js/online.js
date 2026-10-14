@@ -1,5 +1,5 @@
-import {ONLINE_SERVER_URL} from './online-config.js?v=uniform-v13';
-import {initialOrder,players} from '../shared/model.mjs?v=uniform-v13';
+import {ONLINE_SERVER_URL} from './online-config.js?v=presence-v14';
+import {initialOrder,players,ROOM_CAPACITY} from '../shared/model.mjs?v=presence-v14';
 
 // 연결/권한 상태는 이 모듈에서 관리하고, 선수 화면은 app.js에 맡깁니다.
 const $ = selector => document.querySelector(selector);
@@ -129,13 +129,22 @@ function refreshChrome() {
         labeledButton('open-online', '방 참가', 'secondary', () => menu('join')));
     } else {
       const open = labeledButton('open-online', '온라인 방', 'secondary', openLobby);
+      const entry = make('div', undefined, 'online-room-entry');
+      const count = make('span', '', 'online-member-count'); count.id = 'online-member-count'; count.setAttribute('role', 'status'); count.setAttribute('aria-live', 'polite'); count.setAttribute('aria-atomic', 'true');
+      entry.append(open, count);
       const role = make('span', '', 'online-role-status'); role.id = 'online-role-status'; role.setAttribute('role', 'status');
       const start = labeledButton('online-start', '드래프트 시작', 'primary', startDraft);
-      navigation.append(open, role, start);
+      navigation.append(entry, role, start);
     }
   }
   $('#online-turn-timer')?.remove(); // 구버전의 시간 표시가 남아 있어도 정리합니다.
-  if (!room) { $('#online-room-toolbar')?.remove(); return; }
+  if (!room) { $('#online-room-toolbar')?.remove(); $('#online-board-count')?.remove(); return; }
+  let boardCount = $('#online-board-count');
+  if (!boardCount) { boardCount = make('span', '', 'online-member-count'); boardCount.id = 'online-board-count'; boardCount.setAttribute('role', 'status'); $('.board-panel > .section-heading > h2')?.append(boardCount); }
+  const currentCount = room.members.filter(member => member.connected).length;
+  boardCount.textContent = connected ? `${currentCount}/${ROOM_CAPACITY}` : '—';
+  boardCount.setAttribute('aria-label', connected ? `현재 ${currentCount}명 접속 중, 정원 ${ROOM_CAPACITY}명` : '접속 인원 확인 중');
+  $('#online-member-count').textContent = connected ? `현재 ${room.members.filter(member => member.connected).length}명` : '인원 확인 중';
   $('#online-role-status').textContent = mine()?.team ? `${mine().team} 팀장` : '관전중입니다.';
   const start = $('#online-start');
   start.hidden = !isHost() || room.state.started;
@@ -172,6 +181,27 @@ function receiveState(nextRoom) {
   if (room.state.started && !wasStarted) $('#online-lobby')?.close();
   else if ($('#online-lobby')?.open) renderLobby();
 }
+// Keep the draft on screen while removing all room credentials and reconnect timers.
+function roomClosed(message='방장이 방을 나가 방이 종료되었습니다. 오프라인으로 전환합니다.') {
+  const state=room?.state,peer=socket;
+  forget();credentials=null;room=null;socket=null;connected=false;stateFingerprint='';clearTimeout(retry);clearPending();closeConnecting();
+  $('#online-lobby')?.close();$('#online-menu')?.close();peer?.close();
+  const url=new URL(location.href);url.searchParams.delete('room');history.replaceState(null,'',url);
+  if(state)applyState(state);else applyPresence();refreshChrome();
+  let dialog=$('#room-closed-dialog');
+  if(!dialog){dialog=make('dialog');dialog.id='room-closed-dialog';const heading=make('h2','온라인 방 종료'),body=make('p'),button=make('button','확인','primary');button.onclick=()=>dialog.close();dialog.append(heading,body,button);document.body.append(dialog);}
+  dialog.querySelector('p').textContent=message;if(!dialog.open)dialog.showModal();
+}
+async function reconnectRoom(){
+  const saved=credentials;if(!saved)return;
+  try{
+    const response=await fetch(endpoint().replace(/\/$/,'')+`/rooms/${saved.code}/join`,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({token:saved.token}),signal:AbortSignal.timeout(8000)});
+    if(credentials!==saved)return;
+    if(response.status===404)return roomClosed();
+    if(response.ok)return connect();
+  }catch{}
+  if(credentials===saved)retry=setTimeout(reconnectRoom,1500);
+}
 function connect() {
   clearTimeout(retry);
   connected = false;
@@ -184,6 +214,7 @@ function connect() {
     if (socket !== peer || event.data === 'pong') return;
     let message;
     try { message = JSON.parse(event.data); } catch { return; }
+    if (message.type === 'room-closed') return roomClosed(message.message);
     if (message.type === 'state') receiveState(message.room);
     else if (message.type === 'ack' && message.requestId === pending) clearPending();
     else if (message.type === 'error') {
@@ -197,8 +228,9 @@ function connect() {
   peer.onclose = event => {
     if (socket !== peer) return;
     connected = false; clearPending(); refreshChrome(); applyPresence();
+    if (event.code === 4004) return roomClosed();
     if (event.code === 4001) return notify('다른 탭에서 같은 참가자로 접속했습니다.');
-    if (credentials) retry = setTimeout(connect, 1500);
+    if (credentials) retry = setTimeout(reconnectRoom, 1500);
   };
 }
 async function enter(create, name, code) {
@@ -259,7 +291,10 @@ function renderLobby() {
   if (!dialog || !room) return;
   dialog.replaceChildren();
   const title = make('div', undefined, 'online-lobby-title');
-  title.append(make('h2', '온라인 방'), make('span', mine()?.team ? `${mine().team} 팀장` : '관전중입니다.', 'online-role-status'));
+  const heading = make('div', undefined, 'online-lobby-heading');
+  const count = make('span', `현재 ${room.members.filter(member => member.connected).length}명 접속 중`, 'online-member-count'); count.id = 'online-lobby-count'; count.setAttribute('role', 'status');
+  heading.append(make('h2', '온라인 방'), count);
+  title.append(heading, make('span', mine()?.team ? `${mine().team} 팀장` : '관전중입니다.', 'online-role-status'));
   dialog.append(title, make('p', '팀장을 선택하거나 메인 화면의 팀장 카드를 누르세요. 선택한 카드를 다시 누르면 자리가 비워집니다.'));
   const teams = make('div', undefined, 'online-team-options');
   room.state.order.forEach((team, index) => {
