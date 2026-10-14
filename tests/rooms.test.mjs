@@ -55,7 +55,7 @@ test('Ordinary rooms remain unlimited, fixed-order, editable and fully legal',as
    await pause(25);good(await peer.cmd('pick',{player:p.id}));await until(()=>host.room.state.picks.filter(Boolean).length===i+1);
   }
   assert.equal(new Set(host.room.state.picks.map(p=>p.player)).size,20);assert.equal(host.room.state.turnTimer,null);
-  good(await host.cmd('confirm'));assert.equal(host.room.state.resultsConfirmed,true);denied(await host.cmd('undo'));good(await host.cmd('tankSwap',{from:'룩삼',to:'울프'}));
+  good(await host.cmd('confirm'));assert.equal(host.room.state.resultsConfirmed,true);denied(await host.cmd('undo'));denied(await host.cmd('tankSwap',{from:'룩삼',to:'울프'}));
   good(await host.cmd('edit'));good(await host.cmd('undo'));assert.equal(host.room.state.resultsConfirmed,false);assert.equal(host.room.state.turnTimer,null);
   good(await host.cmd('reset'));assert.equal(host.room.state.turnLimitMs,0);assert.equal(host.room.state.autoPick,false);assert.deepEqual(host.room.state.order,initialOrder);
   await pause(30);good(await host.cmd('spectate'));good(await host.cmd('claim',{team:'룩삼'}));

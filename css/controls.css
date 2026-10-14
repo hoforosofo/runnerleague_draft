@@ -89,3 +89,30 @@ button.has-icon { display:inline-flex; align-items:center; justify-content:cente
 .captain[role=button] > div { display:block; }
 .captain[role=button] > div strong { display:none; }
 .captain[role=button] > div small { display:block; font-size:10px; line-height:1.4; }
+/* 최종 팀장 고정, 순서 보기와 모바일 현재 팀 미리보기 */
+.online-room-code{font-family:inherit;font-size:14px;letter-spacing:.02em;font-weight:750}
+.captain .avatar{height:88px;width:100%;max-width:88px}
+.result-portrait,.result-tank{cursor:default!important}.result-member{align-items:center;justify-content:center}.result-portrait .avatar{width:100%;height:100%;object-fit:contain}
+.result-pick-order{display:none;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;overflow:auto;padding:12px 0}.order-view .results-grid{display:none}.order-view .result-pick-order{display:grid}
+.result-pick-card{position:relative;background:white;border:1px solid #dce5f2;border-radius:12px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:8px}.sequence-number{position:absolute;top:8px;left:10px;color:#2463eb;font-weight:800;font-size:15px}.result-order-portrait{width:90px;height:116px;display:flex;align-items:center;justify-content:center}.result-order-portrait .avatar{width:100%;height:100%;object-fit:contain}.result-pick-card strong{font-size:12px}
+.mobile-draft-overview{display:none}
+@media(max-width:1099px){
+ main{display:flex!important;flex-direction:column;height:auto!important;min-height:0}.setup{order:0}.mobile-draft-overview{order:1}.pool-panel{order:2}.board-panel{order:3}.team-section{display:none}
+ .mobile-draft-overview{display:block;position:sticky;top:0;z-index:5;background:#fff;border:1px solid #dce5f2;border-radius:12px;padding:10px;box-shadow:0 3px 12px #17243b10}
+ .mobile-overview-heading{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px}.mobile-overview-heading>span{color:#758399;margin-left:auto}.mobile-overview-heading button{min-height:32px;padding:5px 8px;font-size:11px}
+ .mobile-roster{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}.mobile-roster>div{display:flex;flex-direction:column;align-items:center;gap:4px}.mobile-roster small{font-size:10px;color:#718198}.mobile-roster .avatar,.mobile-empty{width:100%;height:72px;object-fit:contain}.mobile-empty{display:flex;align-items:center;justify-content:center;background:#f4f7fc;border:1px dashed #dce5f2;border-radius:6px;color:#a7b5c8}
+ #mobile-teams-dialog{width:min(680px,calc(100vw - 20px));max-height:90dvh;overflow:auto}.mobile-all-rosters{display:grid;gap:8px;margin:12px 0}.mobile-all-rosters .team{min-height:0}.mobile-all-rosters .slot .avatar{height:76px;max-width:100%;width:100%}.mobile-all-rosters .slots{grid-template-columns:repeat(5,minmax(0,1fr))}
+ .result-pick-order{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:700px){.captain .avatar{height:92px}.result-pick-order{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.result-order-portrait{width:100px;height:125px}}
+#save-results,#save-snake-results{background:#2463eb;border-color:#2463eb;color:#fff}
+#save-results:hover,#save-snake-results:hover,#save-results:focus-visible,#save-snake-results:focus-visible{background:#1e52cb;border-color:#1e52cb;color:#fff}
+.mobile-team-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:6px 0}
+.mobile-team-tabs .secondary{min-height:30px;padding:4px 2px;font-size:11px}
+.mobile-team-tabs [aria-pressed=true]{border-color:#2463eb;background:#edf4ff;color:#2463eb}
+.slots{grid-template-columns:repeat(5,minmax(0,1fr));align-items:center}
+.slot .selected-player{width:100%;display:grid;place-items:center}
+.slot .avatar{width:100%;max-width:64px;height:76px;object-fit:contain}
+.draft-cell .selected-player{width:100%;height:100%;display:grid;place-items:center}
+.draft-cell .avatar{width:100%;max-width:74px;height:84px;object-fit:contain}
+@media(min-width:1100px){main{grid-template-rows:185px minmax(0,1fr)}}
