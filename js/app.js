@@ -1,7 +1,7 @@
-import {online} from './online.js?v=mobile-fix-v17';
+import {online} from './online.js?v=private-address-v18';
 import './touch-drag.js';
-import './button-icons.js?v=mobile-fix-v17';
-import {players,roles,caps,initialOrder,teamAt,eligible} from '../shared/model.mjs?v=mobile-fix-v17';
+import './button-icons.js?v=private-address-v18';
+import {players,roles,caps,initialOrder,teamAt,eligible} from '../shared/model.mjs?v=private-address-v18';
 const $=s=>document.querySelector(s),byId=id=>players.find(p=>p.id===id),displayRole=p=>p.name==='미정'?'미정':roles[p.role];
 let order=[...initialOrder],picks=[],started=false,coachMode=false,filter='all',coaches={},pendingAction=null,selectedCoachTeam=null;
 let tanks=Object.fromEntries(initialOrder.map(team=>[team,team]));

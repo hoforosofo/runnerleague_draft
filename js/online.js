@@ -1,5 +1,5 @@
-import {ONLINE_SERVER_URL} from './online-config.js?v=mobile-fix-v17';
-import {initialOrder,players,ROOM_CAPACITY} from '../shared/model.mjs?v=mobile-fix-v17';
+import {ONLINE_SERVER_URL} from './online-config.js?v=private-address-v18';
+import {initialOrder,players,ROOM_CAPACITY} from '../shared/model.mjs?v=private-address-v18';
 
 // 연결/권한 상태는 이 모듈에서 관리하고, 선수 화면은 app.js에 맡깁니다.
 const $ = selector => document.querySelector(selector);
@@ -31,6 +31,8 @@ function recover(code) {
 }
 // Anonymous room admission uses a persistent browser identifier for room-local bans.
 function deviceId(){const key='runnerleague.device-id';let id=localStorage.getItem(key);if(!id){id=crypto.randomUUID();localStorage.setItem(key,id);}return id;}
+// Room identity stays in session storage; only copied invitations carry the room code.
+function hideRoomFromAddress(code){const url=new URL(location.href),state={...(history.state||{})};url.searchParams.delete('room');if(code)state.runnerleagueRoom=code;history.replaceState(state,'',url);}
 function remember(value) {
   sessionStorage.setItem(sessionKey(value.code), JSON.stringify(value));
   localStorage.setItem(recoveryKey(value.code), JSON.stringify(value));
@@ -252,7 +254,7 @@ async function enter(create, name, code) {
     const data = await response.json();
     if (!response.ok) throw Error(data.error || '방에 접속하지 못했습니다.');
     credentials = data; remember(data);
-    const link = new URL(location.href); link.searchParams.set('room', data.code); history.replaceState(null, '', link);
+    hideRoomFromAddress(data.code);
     $('#online-menu')?.close(); connect();
   } catch (error) { closeConnecting(); throw error; }
 }
@@ -343,7 +345,7 @@ function leaveRoom(silent = false) {
   credentials = null; clearTimeout(retry); clearPending();
   socket?.close(1000, 'site-left'); socket = null; room = null; connected = false;
   if (!silent) {
-    const url = new URL(location.href); url.searchParams.delete('room'); location.replace(url.href);
+    const url = new URL(location.href); url.searchParams.delete('room');history.replaceState(null,'',url);location.replace(url.href);
   }
 }
 window.addEventListener('pagehide', () => leaveRoom(true));
@@ -357,7 +359,8 @@ export const online = {
   init(onState, onNotice, onPresence) {
     applyState = onState; notify = onNotice; applyPresence = onPresence || (() => {});
     const navigation = make('div', undefined, 'connection-tools'); $('.header-right').prepend(navigation); refreshChrome();
-    const code = new URL(location.href).searchParams.get('room') || sessionStorage.getItem('runnerleague.active-room') || localStorage.getItem('runnerleague.active-room');
+    const code = new URL(location.href).searchParams.get('room') || history.state?.runnerleagueRoom || sessionStorage.getItem('runnerleague.active-room') || localStorage.getItem('runnerleague.active-room');
+    hideRoomFromAddress();
     const saved = code && recover(code);
     if (saved && endpoint()) { credentials = saved; showConnecting('온라인 방에 다시 접속 중…'); connect(); }
     else if (code) enter(false, '', code).catch(error => { notify(error.message); menu('join'); $('#online-status').textContent = error.message; });
