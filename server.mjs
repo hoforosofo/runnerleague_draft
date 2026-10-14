@@ -4,7 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {WebSocketServer,WebSocket} from 'ws';
 import {players,initialOrder,caps,eligible} from './model.mjs';
-import {Worker} from 'node:worker_threads';
+import {chooseDraftPlayer} from './draft-ai.mjs';
 const byId=id=>players.find(p=>p.id===id);
 const allowedOrigins=new Set((process.env.ALLOWED_ORIGINS||'https://hoforosofo.github.io,http://127.0.0.1:8766,http://localhost:8766').split(',').map(v=>v.trim()));
 const storage=process.env.DATA_DIR?path.join(process.env.DATA_DIR,'rooms.json'):null;
@@ -107,7 +107,7 @@ const sendJSON=(res,status,data)=>{res.writeHead(status,{'Content-Type':'applica
 const rates=new Map();function rate(ip){const now=Date.now(),x=rates.get(ip)||{at:now,n:0};if(now-x.at>60000){x.at=now;x.n=0}x.n++;rates.set(ip,x);return x.n<=60}
 const server=http.createServer(async(req,res)=>{
  const origin=req.headers.origin;if(origin&&!allowedOrigins.has(origin))return sendJSON(res,403,{error:'허용되지 않은 사이트입니다.'});
- if(origin)res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Headers','Content-Type');res.setHeader('Access-Control-Allow-Methods','POST,GET,OPTIONS');res.setHeader('Access-Control-Max-Age','600');if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}
+ if(origin)res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Headers','Content-Type');res.setHeader('Access-Control-Allow-Methods','POST,GET,OPTIONS');if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}
  if(req.url==='/health'){return sendJSON(res,200,{ok:true})}
  if(req.method!=='POST')return sendJSON(res,404,{error:'찾을 수 없습니다.'});if(!rate(req.socket.remoteAddress))return sendJSON(res,429,{error:'잠시 후 다시 시도하세요.'});
  try{let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>4096)throw Error('요청이 너무 큽니다.')}const data=JSON.parse(raw||'{}'),name=String(data.name||'참가자').trim().slice(0,24)||'참가자';
@@ -131,43 +131,16 @@ wss.on('connection',ws=>{let room=null,me=null;const timer=setTimeout(()=>ws.clo
  if(msg.type!=='command')return;if(msg.revision!==room.revision){ws.send(JSON.stringify({type:'error',requestId,message:'화면이 갱신되었습니다. 다시 시도해 주세요.'}));emit(room);return}command(room,me,msg.action,msg.data);ws.send(JSON.stringify({type:'ack',requestId}));
  }catch(e){ws.send(JSON.stringify({type:'error',requestId,message:e.message}));}});ws.on('close',(code,reason)=>{clearTimeout(timer);if(room&&room.sockets.get(me.id)===ws&&(code===1001||code===1000&&String(reason)==='site-left')){leaveRoom(room,me);return;}if(room&&room.sockets.get(me.id)===ws){room.sockets.delete(me.id);if(room.state.matchmaking&&room.state.matchPhase==='waiting'){room.members=room.members.filter(m=>m.id!==me.id);room.hostId=room.members[0]?.id||null;if(!room.members.length)rooms.delete(room.code);commit(room)}else emit(room)}});ws.on('pong',()=>{ws.isAlive=true});ws.isAlive=true});
 
-const aiJobs=new Map();
-let aiWorker=null,aiSequence=0;
-function autoTurn(r){
- if(!r.state.started||r.state.resultsConfirmed||!r.sockets.size){botWaits.delete(r.code);return null}
+setInterval(()=>{for(const r of rooms.values())for(let step=0;step<25;step++){
+ if(!r.state.started||r.state.resultsConfirmed||!r.sockets.size){botWaits.delete(r.code);break}
  syncTurn(r);
  const index=nextIndex(r),team=r.state.turnOwners[index],owner=r.members.find(m=>m.team===team);
- if(index<0){botWaits.delete(r.code);return null}
+ if(index<0){botWaits.delete(r.code);break}
  const expired=typeof r.state.turnTimer?.deadline==='number'&&Date.now()>=r.state.turnTimer.deadline;
- if(!expired&&(owner&&r.sockets.has(owner.id)||!r.state.autoPick)){botWaits.delete(r.code);return null}
+ if(!expired&&(owner&&r.sockets.has(owner.id)||!r.state.autoPick)){botWaits.delete(r.code);break}
  let wait=botWaits.get(r.code);if(!wait||wait.index!==index){wait={index,until:Date.now()+(owner?reconnectGrace:vacantDelay)};botWaits.set(r.code,wait)}
- return !expired&&Date.now()<wait.until?null:{index,team};
-}
-function worker(){
- if(aiWorker)return aiWorker;
- const peer=new Worker(new URL('./ai-worker.mjs',import.meta.url));aiWorker=peer;
- peer.on('message',({id,decision,error})=>{
-  const job=[...aiJobs.values()].find(j=>j.id===id);if(!job)return;
-  aiJobs.delete(job.code);
-  const r=rooms.get(job.code);if(!r||r.revision!==job.revision)return;
-  const turn=autoTurn(r);
-  if(!turn||turn.index!==job.index||turn.team!==job.team)return;
-  const player=decision&&byId(decision.player.id);
-  if(error||!player||!eligible(player,turn.team,selected(r),false))return;
-  r.state.picks[turn.index]={player:player.id,team:turn.team,automatic:true,autoPolicy:decision.policyVersion};commit(r);
-  requestAi(r); // Continue vacant turns immediately, while HTTP/WS stay responsive.
- });
- peer.on('error',error=>console.error('AI worker:',error.message));
- peer.on('exit',()=>{if(aiWorker===peer){aiWorker=null;aiJobs.clear()}});
- peer.unref();return peer;
-}
-function requestAi(r){
- if(aiJobs.has(r.code))return;
- const turn=autoTurn(r);if(!turn)return;
- const job={...turn,id:++aiSequence,code:r.code,revision:r.revision};aiJobs.set(r.code,job);
- worker().postMessage({id:job.id,state:r.state,team:turn.team});
-}
-setInterval(()=>{for(const r of rooms.values())requestAi(r)},50).unref();
+ if(!expired&&Date.now()<wait.until)break;const decision=chooseDraftPlayer(r.state,team);if(decision){r.state.picks[index]={player:decision.player.id,team,automatic:true,autoPolicy:decision.policyVersion};commit(r)}else break;
+}},50).unref();
 
 const heartbeat=setInterval(()=>{for(const ws of wss.clients){if(!ws.isAlive){ws.terminate();continue}ws.isAlive=false;ws.ping()}},30000);heartbeat.unref();
 setInterval(()=>{const cutoff=Date.now()-7*86400000;for(const [code,r] of rooms)if(!r.sockets.size&&r.updatedAt<cutoff)rooms.delete(code);for(const [ip,v] of rates)if(Date.now()-v.at>60000)rates.delete(ip);persist()},3600000).unref();
