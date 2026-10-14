@@ -20,10 +20,15 @@ const token=()=>crypto.randomBytes(32).toString('base64url');
 function assignRandom(r,m){const vacant=r.state.order.filter(t=>!r.members.some(p=>p.team===t));m.team=vacant.length?vacant[crypto.randomInt(vacant.length)]:null;m.spectator=!m.team;}
 function initial(){return {order:[...initialOrder],picks:[],turnOwners:Array.from({length:20},(_,i)=>initialOrder[Math.floor(i/5)%2?4-i%5:i%5]),coachMode:false,autoPick:true,coaches:{},tanks:Object.fromEntries(initialOrder.map(t=>[t,t])),started:false,resultsConfirmed:false}}
 const selected=r=>r.state.picks.filter(Boolean);
-const count=r=>r.state.coachMode?25:20;
+function count(){return 20}
 function nextIndex(r){for(let i=0;i<count(r);i++)if(!r.state.picks[i])return i;return -1}
 function schedule(r){const s=r.state,remaining=Object.fromEntries(s.order.map(t=>[t,count(r)/5-selected(r).filter(p=>p.team===t).length]));const queue=[];for(let round=0;queue.length<count(r)-selected(r).length;round++)for(const t of round%2?[...s.order].reverse():s.order)if(remaining[t]>0){queue.push(t);remaining[t]--}s.turnOwners=Array.from({length:count(r)},(_,i)=>s.picks[i]?.team||queue.shift())}
 function syncTurn(r){const s=r.state,index=nextIndex(r),team=s.turnOwners[index];if(!s.started||s.resultsConfirmed||index<0){s.turnTimer=null;return}if(!s.turnTimer||s.turnTimer.index!==index||s.turnTimer.team!==team)s.turnTimer={index,team,deadline:Date.now()+turnLimit}}
+for(const r of rooms.values()){
+ if(r.state.coachMode){r.state.picks=r.state.picks.filter(p=>p&&byId(p.player)?.role!=='coach');r.state.coachMode=false;r.state.coaches={};}
+ if(r.state.order.some((t,i)=>t!==initialOrder[i])||r.state.turnOwners.length!==20){r.state.order=[...initialOrder];schedule(r);r.state.turnTimer=null;}
+ if(r.state.matchmaking&&!r.state.started&&r.state.matchPhase!=='waiting'){r.state.matchPhase='waiting';for(const m of r.members)m.team=null;}
+}
 function view(r){const state={...r.state};if(state.ballots)state.ballots=Object.fromEntries(Object.keys(state.ballots).map(id=>[id,true]));return {code:r.code,name:r.name,revision:r.revision,hostId:r.hostId,members:r.members.map(({tokenHash,...m})=>({...m,connected:r.sockets.has(m.id)})),state,updatedAt:r.updatedAt,serverTime:Date.now()}}
 function emit(r){const data=JSON.stringify({type:'state',room:view(r)});for(const socket of r.sockets.values())if(socket.readyState===WebSocket.OPEN)socket.send(data)}
 function commit(r){botWaits.delete(r.code);syncTurn(r);r.revision++;r.updatedAt=Date.now();persist();emit(r)}
@@ -64,9 +69,11 @@ function command(r,m,action,data={}){
   requireHost(r,m);if(s.started)throw Error('이미 시작했습니다.');if(!s.autoPick&&initialOrder.some(t=>!r.members.some(p=>p.team===t)))throw Error('5개 팀의 팀장이 모두 선택되어야 합니다.');
   if(!s.autoPick&&r.members.some(p=>p.team&&!r.sockets.has(p.id)))throw Error('팀장이 모두 접속한 뒤 시작하세요.');s.started=true;
  }else if(action==='order'){
-  requireHost(r,m);if(selected(r).length)throw Error('선발 후 순서를 변경할 수 없습니다.');const {from,to}=data;if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||to<0||from>4||to>4)throw Error('잘못된 순서');[s.order[from],s.order[to]]=[s.order[to],s.order[from]];schedule(r);
+  throw Error('드래프트 순서는 고정되어 있습니다.');
+ }else if(action==='matchVote'||action==='matchPosition'){
+  throw Error('드래프트 순서는 고정되어 있습니다.');
  }else if(action==='coachMode'){
-  requireHost(r,m);if(selected(r).length)throw Error('선발 후 변경할 수 없습니다.');s.coachMode=!!data.enabled;s.coaches={};schedule(r);
+  throw Error('코치 선발은 사용하지 않습니다.');
  }else if(action==='pick'){
   if(!s.started||s.resultsConfirmed)throw Error('방장이 드래프트를 시작해야 합니다.');const idx=nextIndex(r),team=s.turnOwners[idx],p=byId(data.player);
   if(idx<0||m.team!==team)throw Error('자기 팀 차례에만 선택할 수 있습니다.');if(!p||!eligible(p,team,selected(r),s.coachMode))throw Error('선택할 수 없는 선수입니다.');s.picks[idx]={player:p.id,team};
@@ -77,7 +84,7 @@ function command(r,m,action,data={}){
   requireHost(r,m);if(s.resultsConfirmed)throw Error('먼저 수정하기를 누르세요.');const {from,to}=data;if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||to<0||from>=count(r)||to>=count(r)||!s.picks[from])throw Error('교환할 칸이 없습니다.');const copy=Array.from({length:count(r)},(_,i)=>s.picks[i]||null),a=copy[from],b=copy[to];copy[to]={player:a.player,team:s.turnOwners[to]};copy[from]=b?{player:b.player,team:s.turnOwners[from]}:null;
   for(const t of s.order)for(const role of Object.keys(caps))if(copy.filter(p=>p?.team===t&&byId(p.player).role===role).length>caps[role])throw Error('포지션 정원을 초과합니다.');s.picks=copy;
  }else if(action==='coach'){
-  throw Error('코치 선택 모드에서 드래프트로 선발하세요.');
+  throw Error('코치 선발은 사용하지 않습니다.');
  }else if(action==='removeCoach'){
   requireHost(r,m);if(s.resultsConfirmed)throw Error('먼저 수정하기를 누르세요.');delete s.coaches[data.team];
  }else if(action==='confirm'){
@@ -108,7 +115,7 @@ const server=http.createServer(async(req,res)=>{
   const secret=token(),id=crypto.randomUUID();r.members.push({id,name,team:null,spectator:false,joinedAt:Date.now(),tokenHash:sha(secret)});r.hostId||=id;commit(r);return sendJSON(res,201,{code:r.code,token:secret,memberId:id});
  }
  if(req.url==='/rooms'){
-  if(rooms.size>=1000)throw Error('현재 방이 너무 많습니다.');let code;do{code=crypto.randomBytes(4).toString('hex').slice(0,6).toUpperCase()}while(rooms.has(code));const secret=token(),id=crypto.randomUUID(),r={code,name:String(data.roomName||'러너리그 드래프트').slice(0,50),hostId:id,revision:0,updatedAt:Date.now(),members:[{id,name,team:null,spectator:false,tokenHash:sha(secret)}],state:initial(),sockets:new Map()};if(data.order!==undefined){if(!Array.isArray(data.order)||data.order.length!==5||new Set(data.order).size!==5||!data.order.every(t=>initialOrder.includes(t)))throw Error('드래프트 순서를 확인하세요.');r.state.order=[...data.order];schedule(r)}r.state.autoPick=data.autoPick!==false;r.state.randomMatching=data.randomMatching===true;if(r.state.randomMatching)assignRandom(r,r.members[0]);rooms.set(code,r);persist();return sendJSON(res,201,{code,token:secret,memberId:id});
+  if(rooms.size>=1000)throw Error('현재 방이 너무 많습니다.');let code;do{code=crypto.randomBytes(4).toString('hex').slice(0,6).toUpperCase()}while(rooms.has(code));const secret=token(),id=crypto.randomUUID(),r={code,name:String(data.roomName||'러너리그 드래프트').slice(0,50),hostId:id,revision:0,updatedAt:Date.now(),members:[{id,name,team:null,spectator:false,tokenHash:sha(secret)}],state:initial(),sockets:new Map()};if(data.order!==undefined){if(!Array.isArray(data.order)||data.order.length!==5||new Set(data.order).size!==5||!data.order.every(t=>initialOrder.includes(t)))throw Error('드래프트 순서를 확인하세요.');r.state.order=[...initialOrder];schedule(r)}r.state.autoPick=data.autoPick!==false;r.state.randomMatching=data.randomMatching===true;if(r.state.randomMatching)assignRandom(r,r.members[0]);rooms.set(code,r);persist();return sendJSON(res,201,{code,token:secret,memberId:id});
  }
  const leaving=req.url.match(/^\/rooms\/([A-Z0-9]{6})\/leave$/);if(leaving){const r=rooms.get(leaving[1]);const m=r&&member(r,data.token);if(m)leaveRoom(r,m);return sendJSON(res,200,{ok:true});}
  const match=req.url.match(/^\/rooms\/([A-Z0-9]{6})\/join$/);if(!match)return sendJSON(res,404,{error:'찾을 수 없습니다.'});const r=rooms.get(match[1]);if(!r)throw Error('방을 찾을 수 없습니다.');
@@ -117,7 +124,7 @@ const server=http.createServer(async(req,res)=>{
 });
 const wss=new WebSocketServer({noServer:true,maxPayload:8192});
 server.on('upgrade',(req,socket,head)=>{if(req.url!=='/ws'||!allowedOrigins.has(req.headers.origin)){socket.destroy();return}wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws))});
-wss.on('connection',ws=>{let room=null,me=null;const timer=setTimeout(()=>ws.close(1008,'인증 시간 초과'),10000);let windowAt=Date.now(),messages=0;ws.on('message',raw=>{let requestId=null;try{if(Date.now()-windowAt>1000){windowAt=Date.now();messages=0}if(++messages>30)throw Error('요청이 너무 빠릅니다.');const msg=JSON.parse(String(raw));requestId=msg.requestId;if(!room){if(msg.type!=='auth')throw Error('인증이 필요합니다.');room=rooms.get(msg.code);me=room&&member(room,msg.token);if(!me){room=null;throw Error('재접속 정보가 유효하지 않습니다.')}clearTimeout(timer);const previous=room.sockets.get(me.id);room.sockets.set(me.id,ws);if(room.state.turnOwners[nextIndex(room)]===me.team)botWaits.delete(room.code);if(previous&&previous!==ws)previous.close(4001,'다른 탭에서 접속했습니다.');if(room.state.matchmaking&&room.state.matchPhase==='waiting'&&room.members.length===5&&room.members.every(m=>room.sockets.has(m.id))){for(const m of room.members)assignRandom(room,m);room.state.matchPhase='voting';room.state.ballots={};commit(room);}else emit(room);return}
+wss.on('connection',ws=>{let room=null,me=null;const timer=setTimeout(()=>ws.close(1008,'인증 시간 초과'),10000);let windowAt=Date.now(),messages=0;ws.on('message',raw=>{let requestId=null;try{if(Date.now()-windowAt>1000){windowAt=Date.now();messages=0}if(++messages>30)throw Error('요청이 너무 빠릅니다.');const msg=JSON.parse(String(raw));requestId=msg.requestId;if(!room){if(msg.type!=='auth')throw Error('인증이 필요합니다.');room=rooms.get(msg.code);me=room&&member(room,msg.token);if(!me){room=null;throw Error('재접속 정보가 유효하지 않습니다.')}clearTimeout(timer);const previous=room.sockets.get(me.id);room.sockets.set(me.id,ws);if(room.state.turnOwners[nextIndex(room)]===me.team)botWaits.delete(room.code);if(previous&&previous!==ws)previous.close(4001,'다른 탭에서 접속했습니다.');if(room.state.matchmaking&&room.state.matchPhase==='waiting'&&room.members.length===5&&room.members.every(m=>room.sockets.has(m.id))){for(const m of room.members)assignRandom(room,m);room.state.order=[...initialOrder];schedule(room);room.state.matchPhase='draft';room.state.started=true;room.state.ballots={};commit(room);}else emit(room);return}
  if(msg.type!=='command')return;if(msg.revision!==room.revision){ws.send(JSON.stringify({type:'error',requestId,message:'화면이 갱신되었습니다. 다시 시도해 주세요.'}));emit(room);return}command(room,me,msg.action,msg.data);ws.send(JSON.stringify({type:'ack',requestId}));
  }catch(e){ws.send(JSON.stringify({type:'error',requestId,message:e.message}));}});ws.on('close',(code,reason)=>{clearTimeout(timer);if(room&&room.sockets.get(me.id)===ws&&(code===1001||code===1000&&String(reason)==='site-left')){leaveRoom(room,me);return;}if(room&&room.sockets.get(me.id)===ws){room.sockets.delete(me.id);if(room.state.matchmaking&&room.state.matchPhase==='waiting'){room.members=room.members.filter(m=>m.id!==me.id);room.hostId=room.members[0]?.id||null;if(!room.members.length)rooms.delete(room.code);commit(room)}else emit(room)}});ws.on('pong',()=>{ws.isAlive=true});ws.isAlive=true});
 
