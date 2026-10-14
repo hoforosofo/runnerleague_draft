@@ -97,7 +97,7 @@ export class DraftRoom extends DurableObject {
    const path=new URL(request.url).pathname;
    if(path==='/ws'){
     if(!this.room)return json({error:'방을 찾을 수 없습니다.'},404);
-    if(this.ctx.getWebSockets().length>=40)return json({error:'연결 수가 너무 많습니다.'},429);
+    if(this.ctx.getWebSockets().length>=80)return json({error:'연결 수가 너무 많습니다.'},429);
     const [client,server]=Object.values(new WebSocketPair());this.ctx.acceptWebSocket(server);server.serializeAttachment({createdAt:Date.now()});await this.arm();return new Response(null,{status:101,webSocket:client});
    }
    const data=await body(request);
@@ -111,7 +111,7 @@ export class DraftRoom extends DurableObject {
    if(path.endsWith('/leave')){const m=member(r,data.token);if(m){leaveRoom(r,m);await this.save();}return json({ok:true});}
    const old=member(r,data.token);if(old)return json({code:r.code,token:data.token,memberId:old.id});
    if(!/^\/rooms\/[A-Z0-9]{6}\/join$/.test(path))return json({error:'찾을 수 없습니다.'},404);
-   if(r.members.length>=20)throw Error('참가 인원이 가득 찼습니다.');
+   if(r.members.length>=50)throw Error('참가 인원이 가득 찼습니다.');
    const secret=token(),id=crypto.randomUUID();r.members.push({id,name:nameOf(data),team:null,spectator:true,joinedAt:Date.now(),tokenHash:sha(secret)});commit(r);await this.save();return json({code:r.code,token:secret,memberId:id},201);
   }catch(error){return json({error:error.message},400);}
  });}
