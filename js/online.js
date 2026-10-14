@@ -1,5 +1,5 @@
-import {ONLINE_SERVER_URL} from './online-config.js?v=repo-clean-1';
-import {initialOrder,players} from '../shared/model.mjs?v=repo-clean-1';
+import {ONLINE_SERVER_URL} from './online-config.js?v=integrated-v10';
+import {initialOrder,players} from '../shared/model.mjs?v=integrated-v10';
 
 // 연결/권한 상태는 이 모듈에서 관리하고, 선수 화면은 app.js에 맡깁니다.
 const $ = selector => document.querySelector(selector);

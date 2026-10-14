@@ -1,7 +1,7 @@
 import {DurableObject} from 'cloudflare:workers';
 import crypto from 'node:crypto';
 import {eligible} from '../shared/model.mjs';
-import {chooseDraftPlayer} from './ai/draft-ai.mjs';
+import {chooseDraftPlayer,POLICY_VERSION,EVIDENCE_AS_OF} from './ai/draft-ai.mjs';
 import {normalizeRoom,automaticTurn,initial,selected,nextIndex,syncTurn,emit,commit,member,leaveRoom,command,token,sha,byId} from './room-core.mjs';
 
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
@@ -21,7 +21,7 @@ export default {
   let response;
   try{
    if(request.method==='OPTIONS')response=new Response(null,{status:204});
-   else if(url.pathname==='/health'||url.pathname==='/')response=json({ok:true,service:'Runner League Cloudflare'});
+   else if(url.pathname==='/health'||url.pathname==='/')response=json({ok:true,service:'Runner League Cloudflare',aiPolicy:POLICY_VERSION,evidenceAsOf:EVIDENCE_AS_OF});
    else if(url.pathname==='/ws'){
     const code=url.searchParams.get('code');
     if(!origin||!codePattern.test(code||'')||request.headers.get('Upgrade')?.toLowerCase()!=='websocket')return json({error:'올바른 방 연결이 필요합니다.'},400);

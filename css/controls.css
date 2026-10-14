@@ -89,10 +89,64 @@ button.has-icon { display:inline-flex; align-items:center; justify-content:cente
 .captain[role=button] > div { display:block; }
 .captain[role=button] > div strong { display:none; }
 .captain[role=button] > div small { display:block; font-size:10px; line-height:1.4; }
+/* 최종 팀장 고정, 순서 보기와 모바일 현재 팀 미리보기 */
+.online-room-code{font-family:inherit;font-size:14px;letter-spacing:.02em;font-weight:750}
+.captain .avatar{height:88px;width:100%;max-width:88px}
+.result-portrait,.result-tank{cursor:default!important}.result-member{align-items:center;justify-content:center}.result-portrait .avatar{width:100%;height:100%;object-fit:contain}
+.mobile-draft-overview{display:none}
+@media(max-width:1099px){
+ main{display:flex!important;flex-direction:column;height:auto!important;min-height:0}.setup{order:0}.mobile-draft-overview{order:1}.pool-panel{order:2}.board-panel{order:3}.team-section{display:none}
+ .mobile-draft-overview{display:block;position:sticky;top:0;z-index:5;background:#fff;border:1px solid #dce5f2;border-radius:12px;padding:10px;box-shadow:0 3px 12px #17243b10}
+ .mobile-overview-heading{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px}.mobile-overview-heading>span{color:#758399;margin-left:auto}.mobile-overview-heading button{min-height:32px;padding:5px 8px;font-size:11px}
+ .mobile-roster{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}.mobile-roster>div{display:flex;flex-direction:column;align-items:center;gap:4px}.mobile-roster small{font-size:10px;color:#718198}.mobile-roster .avatar,.mobile-empty{width:100%;height:72px;object-fit:contain}.mobile-empty{display:flex;align-items:center;justify-content:center;background:#f4f7fc;border:1px dashed #dce5f2;border-radius:6px;color:#a7b5c8}
+ #mobile-teams-dialog{width:min(680px,calc(100vw - 20px));max-height:90dvh;overflow:auto}.mobile-all-rosters{display:grid;gap:8px;margin:12px 0}.mobile-all-rosters .team{min-height:0}.mobile-all-rosters .slot .avatar{height:76px;max-width:100%;width:100%}.mobile-all-rosters .slots{grid-template-columns:repeat(5,minmax(0,1fr))}
 
-/* Use the exported board itself, preserving its team/round layout. */
-.snake-image-view{width:100%;overflow:auto;background:#f3f6fb;border-radius:12px}
+}
+@media(max-width:700px){.captain .avatar{height:92px}}
+#save-results,#save-snake-results{background:#2463eb;border-color:#2463eb;color:#fff}
+#save-results:hover,#save-snake-results:hover,#save-results:focus-visible,#save-snake-results:focus-visible{background:#1e52cb;border-color:#1e52cb;color:#fff}
+.mobile-team-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:6px 0}
+.mobile-team-tabs .secondary{min-height:30px;padding:4px 2px;font-size:11px}
+.mobile-team-tabs [aria-pressed=true]{border-color:#2463eb;background:#edf4ff;color:#2463eb}
+.slots{grid-template-columns:repeat(5,minmax(0,1fr));align-items:center}
+.slot .selected-player{width:100%;display:grid;place-items:center}
+.slot .avatar{width:100%;max-width:64px;height:76px;object-fit:contain}
+.draft-cell .selected-player{width:100%;height:100%;display:grid;place-items:center}
+.draft-cell .avatar{width:100%;max-width:74px;height:84px;object-fit:contain}
+@media(min-width:1100px){main{grid-template-rows:185px minmax(0,1fr)}}
+
+/* Final views share clear team rows and full rectangular portraits. */
+.snake-image-view{width:100%;overflow:auto;border-radius:12px;background:#f3f6fb}
 .snake-image-view img{display:block;width:100%;height:auto}
 .snake-image-view[hidden],.results-grid[hidden]{display:none}
 .snake-image-view p{text-align:center;padding:16px}
-@media(max-width:600px){.snake-image-view img{min-width:760px}.snake-image-view{overscroll-behavior-x:contain}}
+#results .results-header{display:flex;flex-direction:column;align-items:stretch;gap:16px;margin-bottom:20px}
+#results .results-actions{justify-content:flex-start;gap:8px}
+#results .results-header h1{font-size:28px;margin:6px 0}
+#results:not(.vertical-view) .results-grid{gap:12px}
+#results:not(.vertical-view) .result-team{display:flex;flex-direction:row;align-items:center;gap:18px;padding:14px 20px;min-height:130px}
+#results:not(.vertical-view) .result-team-title{width:125px;flex:none;border:0;padding:0}
+#results:not(.vertical-view) .result-team-title h2{font-size:18px;margin:0}
+#results:not(.vertical-view) .result-roster{display:grid;grid-template-columns:1fr 2fr 2fr;gap:16px;flex:1;max-width:none}
+#results:not(.vertical-view) .result-role>div{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;justify-items:center;gap:12px}
+#results:not(.vertical-view) .result-portrait{width:86px;height:108px;flex:none}
+#results .result-portrait .avatar{width:100%;height:100%;object-fit:contain}
+#results .result-member-meta{display:none}
+#results.vertical-view .result-team{border-top:3px solid #2463eb}
+#results.vertical-view .result-member{justify-content:center}
+#results.vertical-view .result-portrait{width:90px;height:112px}
+@media(max-width:700px){
+ #results .results-header h1{font-size:23px}
+ #results .results-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ #results .view-switch{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+ #results .results-actions button{width:100%;min-height:44px}
+ #results:not(.vertical-view) .result-team{padding:12px;gap:8px;min-height:0;flex-direction:column;align-items:stretch}
+ #results:not(.vertical-view) .result-team-title{width:auto}
+ #results:not(.vertical-view) .result-roster{gap:6px;grid-template-rows:auto}
+ #results:not(.vertical-view) .result-role>div{gap:3px}
+ #results:not(.vertical-view) .result-portrait{width:100%;height:85px;max-width:66px}
+ .snake-image-view img{min-width:760px}
+ .snake-image-view{overscroll-behavior-x:contain}
+}
+
+.result-tank:hover{outline:none;background:transparent}

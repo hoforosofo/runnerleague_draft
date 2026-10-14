@@ -1,7 +1,7 @@
-import {online} from './online.js?v=repo-clean-1';
+import {online} from './online.js?v=integrated-v10';
 import './touch-drag.js';
-import './button-icons.js?v=repo-clean-1';
-import {players,roles,caps,initialOrder,teamAt,eligible} from '../shared/model.mjs?v=repo-clean-1';
+import './button-icons.js?v=integrated-v10';
+import {players,roles,caps,initialOrder,teamAt,eligible} from '../shared/model.mjs?v=integrated-v10';
 const $=s=>document.querySelector(s),byId=id=>players.find(p=>p.id===id),displayRole=p=>p.name==='미정'?'미정':roles[p.role];
 let order=[...initialOrder],picks=[],started=false,coachMode=false,filter='all',coaches={},pendingAction=null,selectedCoachTeam=null;
 let tanks=Object.fromEntries(initialOrder.map(team=>[team,team]));
@@ -9,7 +9,7 @@ const rosterRank=new Map(players.map((p,i)=>[p.id,i]));
 const sortRoster=list=>[...list].sort((a,b)=>rosterRank.get(a.id)-rosterRank.get(b.id));
 const colors=['#8fbbff','#c3a0ee','#e6b879','#75cfc7','#df8daa'];
 const avatar=(p,extra='')=>p.image?`<img class="avatar ${extra}" src="${p.image}" alt="${p.name}" draggable="false">`:`<span class="avatar photo-empty ${extra}" aria-label="${p.name} 사진 없음">${p.name.slice(0,2)}</span>`;
-let turnOwners=[],resultsConfirmed=false,completionPrompted=false,resultView='horizontal';
+let turnOwners=[],resultsConfirmed=false,completionPrompted=false,resultView='horizontal',mobilePreviewTeam=null;
 const total=()=>20;
 const chosen=()=>picks.filter(Boolean);
 const nextIndex=()=>{for(let i=0;i<total();i++)if(!picks[i])return i;return -1};
@@ -55,7 +55,7 @@ function renderPool(){const active=current(),available=players.filter(p=>p.role!
  document.querySelectorAll('[data-role]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.role===filter)));
 }
 function renderBoard(){const active=started?current():null,done=started&&!active;$('#undo').disabled=chosen().length===0;$('#turn-banner').innerHTML=!started?'<span class="turn-number">—</span><div><strong>드래프트 준비</strong><small>팀장 순서는 고정되어 있습니다.</small></div>':done?`<span class="turn-number">✓</span><div><strong>드래프트 완료</strong><small>5개 팀의 구성이 완성되었습니다.</small></div><span class="turn-badge">COMPLETE</span>`:`${avatar(byId(active))}<div><strong>${active} 팀의 선택</strong><small>${Math.floor(nextIndex()/5)+1}라운드 · 전체 ${nextIndex()+1}번째 선발</small></div><span class="turn-badge">NOW PICKING</span>`;$('#progress').style.width=`${chosen().length/total()*100}%`;
- let html=order.map((team,col)=>{let cells='';for(let round=0;round<total()/5;round++){const idx=turnOwners.map((owner,i)=>owner===team?i:-1).filter(i=>i>=0)[round],entry=picks[idx],p=entry?byId(entry.player):null,isCurrent=started&&idx===nextIndex();cells+=`<div class="draft-cell ${p?'filled':''} ${isCurrent?'current':''}" data-pick-index="${idx}" title="${entry?.automatic?'자동 선발':''}" aria-label="${idx+1}번째, ${team} 팀${p?', '+p.name:isCurrent?', 현재 차례':''}"><span class="pick-number">${idx+1}</span>${p?`${`<button class="selected-player" data-remove-player="${p.id}" aria-label="${p.name} 선발 취소" title="${p.name} · 클릭하여 선발 취소">${avatar(p)}</button>`}<strong>${p.name}${p.name==='미정'?'<small class="undecided">출전 미정</small>':''}</strong><span class="role-mini">${displayRole(p)}${entry.automatic?' · AI':''}</span>${entry.automatic?'<span class="ai-pick-badge">AI</span>':''}`:isCurrent?'<small>선수 선택</small>':''}</div>`}return `<div class="draft-team-row ${active===team?'active':''}" style="--rounds:${total()/5}"><div class="board-captain">${avatar(byId(tanks[team]))}<strong>${team}</strong><small>${col+1}팀</small></div>${cells}</div>`}).join('');$('#board').innerHTML=html;
+ let html=order.map((team,col)=>{let cells='';for(let round=0;round<total()/5;round++){const idx=turnOwners.map((owner,i)=>owner===team?i:-1).filter(i=>i>=0)[round],entry=picks[idx],p=entry?byId(entry.player):null,isCurrent=started&&idx===nextIndex();cells+=`<div class="draft-cell ${p?'filled':''} ${isCurrent?'current':''}" data-pick-index="${idx}" title="${entry?.automatic?'자동 선발':''}" aria-label="${idx+1}번째, ${team} 팀${p?', '+p.name:isCurrent?', 현재 차례':''}"><span class="pick-number">${idx+1}</span>${p?`${`<button class="selected-player" data-remove-player="${p.id}" aria-label="${p.name} 선발 취소" title="${p.name} · 클릭하여 선발 취소">${avatar(p)}</button>`}<strong>${p.name}${p.name==='미정'?'<small class="undecided">출전 미정</small>':''}</strong><span class="role-mini">${displayRole(p)}${entry.automatic?' · AI':''}</span>${entry.automatic?'<span class="ai-pick-badge">AI</span>':''}`:isCurrent?'<small>선수 선택</small>':''}</div>`}return `<div class="draft-team-row ${active===team?'active':''}" style="--rounds:${total()/5}"><div class="board-captain">${avatar(byId(tanks[team]))}<strong>${team}</strong></div>${cells}</div>`}).join('');$('#board').innerHTML=html;
 
  document.querySelectorAll('[data-pick-index]').forEach(cell=>{
  const index=Number(cell.dataset.pickIndex);cell.draggable=!!picks[index];
@@ -72,7 +72,7 @@ function swapPicks(from,to){if(online.action('swap',{from,to}))return;
  for(const team of order){const roster=updated.filter(p=>p?.team===team);for(const role of ['damage','support','coach'])if(roster.filter(p=>byId(p.player).role===role).length>caps[role]){toast('팀의 포지션 정원을 초과해 교환할 수 없습니다.');return}}
  picks=updated;render();toast(`${from+1}번과 ${to+1}번 칸의 선수를 교환했습니다.`);
 }
-function render(){document.body.classList.toggle('no-coaches',!coachMode);if(!coachMode&&filter==='coach')filter='all';document.querySelector('.team-section>.section-heading>.muted').textContent=`팀별 공격 2명 · 지원 2명${coachMode?' · 코치 1명':''}`;renderCaptains();renderTeams();renderPool();renderBoard();renderResults();bindRemovals();onlinePermissions()}
+function render(){document.body.classList.toggle('no-coaches',!coachMode);if(!coachMode&&filter==='coach')filter='all';document.querySelector('.team-section>.section-heading>.muted').textContent=`팀별 공격 2명 · 지원 2명${coachMode?' · 코치 1명':''}`;renderCaptains();renderTeams();renderPool();renderBoard();renderResults();bindRemovals();onlinePermissions();renderMobileOverview()}
 // 방장 변경이나 재접속 때도 버튼 권한을 양방향으로 갱신합니다.
 function onlinePermissions(){
  if(!online.active())return;
@@ -102,21 +102,16 @@ function renderResults(){
  screen.hidden=!(complete&&resultsConfirmed);document.body.classList.toggle('show-results',complete&&resultsConfirmed);
  if(!complete||!resultsConfirmed)return;
  screen.classList.toggle('vertical-view',resultView==='vertical');
- screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>${resultView==='order'?'저장 이미지와 동일한 팀별·라운드별 선발 순서입니다.':'선발이 완료되었습니다. 돌격 카드를 드래그하거나 클릭해 다른 팀의 탱커와 교환할 수 있습니다.'}</p></div><div class="results-actions"><button class="secondary" id="save-result-draft">임시저장</button><button class="secondary" id="load-result-draft">불러오기</button><div class="view-switch" aria-label="팀 구성 보기"><button class="secondary" data-view="horizontal" aria-pressed="${resultView==='horizontal'}">가로 보기</button><button class="secondary" data-view="vertical" aria-pressed="${resultView==='vertical'}">세로 보기</button><button class="secondary" data-view="order" aria-pressed="${resultView==='order'}">드래프트 순서 보기</button></div><button class="primary" id="save-results">결과 이미지 저장</button><button class="secondary" id="save-snake-results">드래프트 순서 이미지 저장</button><button class="secondary" id="edit-draft">수정하기</button><button class="primary" id="restart-draft">드래프트 다시하기</button></div></div><div class="snake-image-view" ${resultView==='order'?'':'hidden'}><img id="snake-result-image" alt="팀별·라운드별 드래프트 선발 순서"><p id="snake-image-status" role="status">순서 이미지 준비 중…</p></div><div class="results-grid" ${resultView==='order'?'hidden':''}>${order.map((team,i)=>{
+ screen.classList.toggle('order-view',resultView==='order');
+ screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>팀 구성과 실제 선발 순서를 확인하세요.</p></div><div class="results-actions"><button class="secondary" id="save-result-draft">임시저장</button><button class="secondary" id="load-result-draft">불러오기</button><div class="view-switch" aria-label="팀 구성 보기"><button class="secondary" data-view="horizontal" aria-pressed="${resultView==='horizontal'}">가로 보기</button><button class="secondary" data-view="vertical" aria-pressed="${resultView==='vertical'}">세로 보기</button><button class="secondary" data-view="order" aria-pressed="${resultView==='order'}">순서대로 보기</button></div><button class="primary" id="save-results">결과 이미지 저장</button><button class="primary" id="save-snake-results">드래프트 순서 이미지 저장</button><button class="secondary" id="edit-draft">수정하기</button><button class="primary" id="restart-draft">드래프트 다시하기</button></div></div><div class="snake-image-view" ${resultView==='order'?'':'hidden'}><img id="snake-result-image" alt="팀별·라운드별 드래프트 선발 순서"><p id="snake-image-status" role="status">순서 이미지 준비 중…</p></div><div class="results-grid" ${resultView==='order'?'hidden':''}>${order.map((team,i)=>{
  const roster=chosen().filter(p=>p.team===team).map(p=>byId(p.player));
 
- return `<article class="result-team" style="--team-color:${colors[i]}" aria-label="${tanks[team]} 팀"><div class="result-team-title"><small>TEAM ${String(i+1).padStart(2,'0')}</small><h2>${tanks[team]} 팀</h2></div><div class="result-roster">${(coachMode?['tank','damage','support','coach']:['tank','damage','support']).map(role=>{const list=role==='tank'?[byId(tanks[team])]:sortRoster(roster.filter(p=>p.role===role));return `<div class="result-role"><span>${roles[role]}</span><div>${list.map(p=>role==='tank'?`<div class="result-member"><button class="result-portrait result-tank" draggable="true" data-edit-tank="${team}" aria-label="${p.name} 탱커 교체" title="탱커 교체">${avatar(p)}</button><span class="result-member-meta"><strong>${p.name}</strong><small>${roles[p.role]}</small></span></div>`:`<div class="result-member"><div class="result-portrait">${avatar(p)}</div><span class="result-member-meta"><strong>${p.name}</strong><small>${roles[p.role]}</small></span></div>`).join('')}</div></div>`}).join('')}</div></article>`
+ return `<article class="result-team" style="--team-color:${colors[i]}" aria-label="${tanks[team]} 팀"><div class="result-team-title"><h2>${tanks[team]} 팀</h2></div><div class="result-roster">${(coachMode?['tank','damage','support','coach']:['tank','damage','support']).map(role=>{const list=role==='tank'?[byId(tanks[team])]:sortRoster(roster.filter(p=>p.role===role));return `<div class="result-role"><span>${roles[role]}</span><div>${list.map(p=>role==='tank'?`<div class="result-member"><div class="result-portrait result-tank">${avatar(p)}</div><span class="result-member-meta"><strong>${p.name}</strong><small>${roles[p.role]}</small></span></div>`:`<div class="result-member"><div class="result-portrait">${avatar(p)}</div><span class="result-member-meta"><strong>${p.name}</strong><small>${roles[p.role]}</small></span></div>`).join('')}</div></div>`}).join('')}</div></article>`
  }).join('')}</div>`;
+ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{resultView=b.dataset.view;renderResults();bindRemovals();onlinePermissions();renderMobileOverview()});
  if(resultView==='order')showSnakeImage();
- document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{resultView=b.dataset.view;renderResults();bindRemovals();onlinePermissions()});
- document.querySelectorAll('[data-edit-tank]').forEach(b=>{
- b.onclick=()=>openTankPicker(b.dataset.editTank);
- b.ondragstart=e=>{e.dataTransfer.setData('application/x-result-tank',b.dataset.editTank);e.dataTransfer.effectAllowed='move'};
- b.ondragover=e=>{if(e.dataTransfer.types.includes('application/x-result-tank'))e.preventDefault()};
- b.ondrop=e=>{e.preventDefault();const source=e.dataTransfer.getData('application/x-result-tank'),target=b.dataset.editTank;if(source===target||!order.includes(source))return;if(online.action('tankSwap',{from:source,to:target}))return;[tanks[source],tanks[target]]=[tanks[target],tanks[source]];render()};
- });
  $('#save-result-draft').onclick=saveDraft;$('#load-result-draft').onclick=openSavedDrafts;
- $('#save-results').onclick=resultView==='order'?downloadSnakeImage:downloadResultsImage;$('#save-snake-results').onclick=downloadSnakeImage;
+ $('#save-results').onclick=downloadResultsImage;$('#save-snake-results').onclick=downloadSnakeImage;
  $('#edit-draft').onclick=()=>{if(online.action('edit'))return;resultsConfirmed=false;completionPrompted=true;render();window.scrollTo(0,0)};
  $('#restart-draft').onclick=()=>{reset(true);window.scrollTo(0,0)};
 }
@@ -163,6 +158,7 @@ async function downloadSnakeImage(){
  }catch(error){toast('드래프트 순서 이미지 저장에 실패했습니다.');console.error(error)}finally{button.disabled=false;button.textContent='드래프트 순서 이미지 저장'}
 }
 async function downloadResultsImage(){
+ if(resultView==='order')return downloadSnakeImage();
  const button=$('#save-results');if(!resultsConfirmed||button.disabled)return;button.disabled=true;button.textContent='저장 중…';
  try{
   await document.fonts.ready;
@@ -178,29 +174,21 @@ async function downloadResultsImage(){
    const roster=chosen().filter(p=>p.team===team).map(p=>byId(p.player));
    const members=[byId(tanks[team]),...sortRoster(roster.filter(p=>p.role==='damage')),...sortRoster(roster.filter(p=>p.role==='support')),...roster.filter(p=>p.role==='coach')];
    if(vertical){
-    const x=32+i*310,y=110,w=296,h=918;box(x,y,w,h,'#fff');box(x,y,w,4,colors[i],2);text(`TEAM ${String(i+1).padStart(2,'0')}`,x+18,y+32,12,'#2463eb',750);text(`${tanks[team]} 팀`,x+18,y+62,22,'#17243b',750);
+    const x=32+i*310,y=110,w=296,h=918;box(x,y,w,h,'#fff');box(x,y,w,4,colors[i],2);text(`${tanks[team]} 팀`,x+18,y+62,22,'#17243b',750);
     members.forEach((p,j)=>{const ry=y+86+j*(798/members.length);portrait(p,x+18,ry+8,82,106);text(p.name,x+114,ry+51,16);text(roles[p.role],x+114,ry+75,12,'#7b889d',500);ctx.fillStyle='#e3eaf4';ctx.fillRect(x+18,ry+129,w-36,1)});
    }else{
-    const x=32,y=110+i*151,w=1536,h=139;box(x,y,w,h,'#fff');box(x,y,4,h,colors[i],2);text(`TEAM ${String(i+1).padStart(2,'0')}`,x+18,y+48,12,'#2463eb',750);text(`${tanks[team]} 팀`,x+18,y+78,21,'#17243b',750);
+    const x=32,y=110+i*151,w=1536,h=139;box(x,y,w,h,'#fff');box(x,y,4,h,colors[i],2);text(`${tanks[team]} 팀`,x+18,y+78,21,'#17243b',750);
     members.forEach((p,j)=>{const px=x+180+j*(1308/members.length);ctx.font='600 11px League, sans-serif';ctx.fillStyle='#7b889d';ctx.textAlign='center';ctx.fillText(roles[p.role],px+88,y+17);ctx.textAlign='left';portrait(p,px,y+24,176,106)});
    }
   }
   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('PNG 생성 실패');const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`runnerleague_results_${resultView}.png`;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
  }catch(error){toast('이미지 저장에 실패했습니다. 다시 시도해 주세요.');console.error(error)}finally{button.disabled=false;button.textContent='결과 이미지 저장'}
 }
-function openTankPicker(team){
- if(!resultsConfirmed)return;
- let dialog=$('#tank-dialog');
- if(!dialog){dialog=document.createElement('dialog');dialog.id='tank-dialog';dialog.setAttribute('aria-labelledby','tank-title');document.body.append(dialog)}
- dialog.innerHTML=`<h2 id="tank-title">${team} 팀 탱커 교체</h2><p>다른 팀의 탱커를 선택하면 두 팀의 탱커가 서로 교환됩니다.</p><div class="tank-options">${players.filter(p=>p.role==='tank').map(p=>`<button class="tank-option" data-tank="${p.id}" ${tanks[team]===p.id?'disabled':''}>${avatar(p)}<strong>${p.name}</strong></button>`).join('')}</div><button class="secondary" id="close-tank">닫기</button>`;
- dialog.querySelectorAll('[data-tank]').forEach(b=>b.onclick=()=>{const other=order.find(t=>tanks[t]===b.dataset.tank);if(!other||other===team)return;if(online.action('tankSwap',{from:team,to:other})){$('#tank-dialog').close();return}[tanks[team],tanks[other]]=[tanks[other],tanks[team]];dialog.close();render()});
- $('#close-tank').onclick=()=>dialog.close();dialog.showModal();
-}
 const SAVE_KEY='runnerleague.saved-drafts.v1';
 function readSavedDrafts(){const raw=localStorage.getItem(SAVE_KEY);if(!raw)return [];const data=JSON.parse(raw);if(!Array.isArray(data))throw Error('저장 목록 오류');return data}
 function snapshotDraft(){return {version:1,order:[...order],picks:picks.map(p=>p?{...p}:null),turnOwners:[...turnOwners],coachMode,coaches:{...coaches},tanks:{...tanks},filter,started,resultsConfirmed,resultView}}
 function withoutCoaches(s){
- const clean={...s,order:[...initialOrder],coachMode:false,coaches:{},filter:s.filter==='coach'?'all':s.filter};
+ const clean={...s,tanks:Object.fromEntries(initialOrder.map(team=>[team,team])),order:[...initialOrder],coachMode:false,coaches:{},filter:s.filter==='coach'?'all':s.filter};
  if(s.coachMode||s.picks.some(p=>p&&byId(p.player)?.role==='coach')||s.order.some((t,i)=>t!==initialOrder[i])){
   clean.picks=s.coachMode?s.picks.filter(p=>p&&byId(p.player)?.role!=='coach'):[...s.picks];
   const picked=clean.picks.filter(Boolean);
@@ -264,4 +252,21 @@ function reset(edit){if(online.action('reset'))return;order=[...initialOrder];ta
 $('#undo').onclick=()=>{if(online.action('undo'))return;const last=chosen().at(-1);if(last)removePlayer(last.player)};$('#reset').onclick=()=>confirmReset(false);$('#edit-order').onclick=()=>confirmReset(true);$('#cancel-confirm').onclick=()=>$('#confirm').close();$('#accept-confirm').onclick=()=>{pendingAction?.();$('#confirm').close();pendingAction=null};document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>{filter=b.dataset.role;renderPool()});document.querySelectorAll('dialog').forEach(d=>d.onclick=e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close()}});schedule();render();
 initDraftStorage();
 
-online.init(state=>{state=withoutCoaches(state);order=[...state.order];picks=state.picks.map(p=>p?{...p}:null);turnOwners=[...state.turnOwners];coachMode=state.coachMode;coaches={};tanks={...state.tanks};started=state.started;resultsConfirmed=state.resultsConfirmed;render()},toast,()=>{renderCaptains();renderPool();onlinePermissions();});
+online.init(state=>{state=withoutCoaches(state);order=[...state.order];picks=state.picks.map(p=>p?{...p}:null);turnOwners=[...state.turnOwners];coachMode=state.coachMode;coaches={};tanks={...state.tanks};started=state.started;resultsConfirmed=state.resultsConfirmed;render()},toast,()=>{renderCaptains();renderPool();onlinePermissions();renderMobileOverview();});
+
+// 작은 화면에서는 현재 팀의 이미 뽑힌 선수와 다음 차례를 선수 목록 위에 유지합니다.
+function renderMobileOverview(){
+ let panel=document.querySelector('#mobile-draft-overview');
+ if(!panel){panel=document.createElement('section');panel.id='mobile-draft-overview';panel.className='mobile-draft-overview';document.querySelector('.setup').after(panel);}
+ const team=mobilePreviewTeam||online.me()?.team||current()||order[0],roster=chosen().filter(p=>p.team===team).map(p=>byId(p.player));
+ const members=[byId(team),...sortRoster(roster.filter(p=>p.role==='damage')),...Array(Math.max(0,2-roster.filter(p=>p.role==='damage').length)).fill(null),...sortRoster(roster.filter(p=>p.role==='support')),...Array(Math.max(0,2-roster.filter(p=>p.role==='support').length)).fill(null)];
+ panel.innerHTML=`<div class="mobile-overview-heading"><strong>${started&&current()?current()+' 팀 선발 중':started?'선발 완료':'드래프트 준비'}</strong><span>${chosen().length} / 20</span><button class="secondary" id="mobile-all-teams">전체 팀 구성</button></div><div class="mobile-team-tabs">${order.map(id=>`<button class="secondary" data-mobile-team="${id}" aria-pressed="${id===team}">${id}</button>`).join('')}</div><div class="mobile-roster">${members.map((p,i)=>`<div><small>${i===0?'탱커':i<3?'딜러':'힐러'}</small>${p?avatar(p):'<span class="mobile-empty">—</span>'}</div>`).join('')}</div>`;
+ panel.querySelectorAll('[data-mobile-team]').forEach(button=>button.onclick=()=>{mobilePreviewTeam=button.dataset.mobileTeam;renderMobileOverview()});
+ document.querySelector('#mobile-all-teams').onclick=()=>{
+  let dialog=document.querySelector('#mobile-teams-dialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='mobile-teams-dialog';document.body.append(dialog);}
+  dialog.innerHTML='<h2>전체 팀 구성</h2><div class="mobile-all-rosters">'+document.querySelector('#teams').innerHTML+'</div><button class="primary" id="close-mobile-teams">닫기</button>';
+  dialog.querySelectorAll('.selected-player').forEach(button=>button.disabled=true);
+  dialog.querySelector('#close-mobile-teams').onclick=()=>dialog.close();dialog.showModal();
+ };
+ if(document.querySelector('#mobile-teams-dialog')?.open){const dialog=document.querySelector('#mobile-teams-dialog');dialog.querySelector('.mobile-all-rosters').innerHTML=document.querySelector('#teams').innerHTML;dialog.querySelectorAll('.selected-player').forEach(button=>button.disabled=true);}
+}

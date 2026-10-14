@@ -5,7 +5,7 @@ import {evidenceWeight,weightedAdjustment,signals,WOLF_PROFILES} from '../cloudf
 import {players,initialOrder,eligible,teamAt} from '../shared/model.mjs';
 
 test('Latest captain context changes the draft without treating preferences as skill ranks',()=>{
- assert.equal(POLICY_VERSION,'runnerleague-community-v9');
+ assert.equal(POLICY_VERSION,'runnerleague-community-v10');
  const s={order:initialOrder,picks:[{player:'뱅',team:'룩삼'},{player:'김뿡',team:'콩콩'}]};
  assert.equal(chooseDraftPlayer(s,'둥그레').player.id,'큐베');
  s.picks.push({player:'큐베',team:'둥그레'});
@@ -87,4 +87,21 @@ test('Undo holes and swapped turn owners remain legal and preserve existing pick
  const before=JSON.stringify(s),c=chooseDraftPlayer(s,s.turnOwners[2]);
  assert.ok(eligible(c.player,s.turnOwners[2],s.picks.filter(Boolean),false));
  assert.equal(JSON.stringify(s),before);
+});
+
+// Exercise the complete opening: testing only a hand-built first two picks hid the regression.
+test('Full automatic opening keeps top pair, Cuve, DDD and a plausible Wolf pair',()=>{
+ const s={order:initialOrder,picks:[]};
+ for(let i=0;i<6;i++){
+  const team=teamAt(i,s.order),choice=chooseDraftPlayer(s,team);
+  s.picks.push({player:choice.player.id,team});
+ }
+ assert.deepEqual(new Set(s.picks.slice(0,2).map(p=>p.player)),new Set(['김뿡','뱅']));
+ assert.equal(s.picks[2].player,'큐베');assert.equal(s.picks[3].player,'디디디용');
+ assert.equal(s.picks[4].player,'양아지');
+ assert.ok(['남봉','마뫄'].includes(s.picks[5].player));
+ const swapped={order:initialOrder,picks:[{player:'김뿡',team:'룩삼'}]};
+ assert.equal(chooseDraftPlayer(swapped,'콩콩').player.id,'뱅');
+ swapped.picks.push({player:'뱅',team:'콩콩'});
+ assert.equal(chooseDraftPlayer(swapped,'둥그레').player.id,'큐베');
 });

@@ -13,6 +13,7 @@ function syncTurn(r){r.state.turnLimitMs=0;r.state.turnTimer=null;}
 // 기존 방의 토큰과 선발 내역을 보존하면서 폐기한 설정만 정리합니다.
 function normalizeRoom(room){
  for(const key of ['matchmaking','randomMatching','matchPhase','ballots','positions','choiceOrder','matchScores'])delete room.state[key];
+ room.state.tanks=Object.fromEntries(initialOrder.map(team=>[team,team]));
  syncTurn(room);
  for(const member of room.members)member.spectator=!member.team;
 }
@@ -70,7 +71,7 @@ function command(r,m,action,data={}){
  }else if(action==='edit'){
   requireHost(r,m);s.resultsConfirmed=false;
  }else if(action==='tankSwap'){
-  requireHost(r,m);if(!s.resultsConfirmed||!s.order.includes(data.from)||!s.order.includes(data.to))throw Error('최종 화면에서만 교환할 수 있습니다.');[s.tanks[data.from],s.tanks[data.to]]=[s.tanks[data.to],s.tanks[data.from]];
+  throw Error('탱커는 교체할 수 없습니다.');
  }else if(action==='reset'){
   requireHost(r,m);const autoPick=s.autoPick;r.state=initial();r.state.autoPick=autoPick;
  }else if(action==='release'){
