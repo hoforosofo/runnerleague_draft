@@ -26,7 +26,7 @@ function automaticTurn(room,now=Date.now(),grace=30000){
  if(owner&&(room.sockets.has(owner.id)||now-(owner.disconnectedAt||now)<grace))return null;
  return {index,team};
 }
-function view(r){const state={...r.state};return {code:r.code,name:r.name,revision:r.revision,hostId:r.hostId,members:r.members.map(({tokenHash,...m})=>({...m,connected:r.sockets.has(m.id)})),state,updatedAt:r.updatedAt,serverTime:Date.now()}}
+function view(r){const state={...r.state};return {code:r.code,name:r.name,revision:r.revision,hostId:r.hostId,members:r.members.map(({tokenHash,deviceIdHash,...m})=>({...m,connected:r.sockets.has(m.id)})),state,updatedAt:r.updatedAt,serverTime:Date.now()}}
 function emit(r){if(r.deferEmit)return;const data=JSON.stringify({type:'state',room:view(r)});for(const socket of r.sockets.values())if(socket.readyState===1){try{socket.send(data)}catch{}}}
 function commit(r){syncTurn(r);r.revision++;r.updatedAt=Date.now();emit(r)}
 function member(r,value){return r.members.find(m=>m.tokenHash===sha(String(value||'')))}
@@ -77,6 +77,13 @@ function command(r,m,action,data={}){
   requireHost(r,m);s.resultsConfirmed=false;
  }else if(action==='tankSwap'){
   throw Error('탱커는 교체할 수 없습니다.');
+ }else if(action==='kick'){
+  requireHost(r,m);const target=r.members.find(p=>p.id===data.memberId);
+  if(!target)throw Error('참가자를 찾을 수 없습니다.');
+  if(target.id===r.hostId)throw Error('방장은 추방할 수 없습니다.');
+  r.bans??=[];r.bans.push({tokenHash:target.tokenHash,deviceIdHash:target.deviceIdHash||null});
+  const socket=r.sockets.get(target.id);try{socket?.send(JSON.stringify({type:'kicked',message:'방장에 의해 추방되었습니다. 이 방에는 다시 입장할 수 없습니다. 오프라인으로 전환합니다.'}));socket?.close(4003,'kicked')}catch{}
+  r.sockets.delete(target.id);r.members=r.members.filter(p=>p.id!==target.id);
  }else if(action==='reset'){
   requireHost(r,m);const autoPick=s.autoPick;r.state=initial();r.state.autoPick=autoPick;
  }else if(action==='release'){

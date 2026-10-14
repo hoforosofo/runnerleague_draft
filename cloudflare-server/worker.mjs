@@ -6,6 +6,8 @@ import {normalizeRoom,automaticTurn,initial,selected,nextIndex,syncTurn,emit,com
 
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
 const codePattern=/^[A-Z0-9]{6}$/;
+const deviceHash=data=>typeof data.deviceId==='string'&&/^[a-zA-Z0-9-]{16,80}$/.test(data.deviceId)?sha(data.deviceId):null;
+const banned=(r,data)=>r.bans?.some(b=>b.tokenHash===sha(String(data.token||''))||b.deviceIdHash&&b.deviceIdHash===deviceHash(data));
 const nameOf=data=>String(data.name||'참가자').trim().slice(0,24)||'참가자';
 async function body(request){const text=await request.text();if(text.length>4096)throw Error('요청이 너무 큽니다.');return JSON.parse(text||'{}');}
 const stub=(env,code)=>env.ROOMS.getByName(code);
@@ -106,15 +108,16 @@ export class DraftRoom extends DurableObject {
    if(path==='/create'){
     if(this.room)return json({error:'이미 존재하는 방입니다.'},409);
     const secret=token(),id=crypto.randomUUID(),s=initial();s.autoPick=data.autoPick!==false;
-    this.room={code:data.code,name:String(data.roomName||'러너리그 드래프트').slice(0,50),hostId:id,revision:0,updatedAt:Date.now(),members:[{id,name:nameOf(data),team:null,spectator:true,joinedAt:Date.now(),tokenHash:sha(secret)}],state:s,sockets:new Map(),deferEmit:true};
+    this.room={code:data.code,name:String(data.roomName||'러너리그 드래프트').slice(0,50),hostId:id,revision:0,updatedAt:Date.now(),members:[{id,name:nameOf(data),team:null,spectator:true,joinedAt:Date.now(),tokenHash:sha(secret),deviceIdHash:deviceHash(data)}],bans:[],state:s,sockets:new Map(),deferEmit:true};
     await this.save();return json({code:data.code,token:secret,memberId:id},201);
    }
    const r=this.room;if(!r)return json({error:'방을 찾을 수 없습니다.'},404);
    if(path.endsWith('/leave')){const m=member(r,data.token);if(m){leaveRoom(r,m);await this.save();}return json({ok:true});}
-   const old=member(r,data.token);if(old)return json({code:r.code,token:data.token,memberId:old.id});
+   if(banned(r,data))return json({error:'이 방에서 추방되어 다시 입장할 수 없습니다.'},403);
+   const old=member(r,data.token);if(old){if(!old.deviceIdHash)old.deviceIdHash=deviceHash(data);await this.save();return json({code:r.code,token:data.token,memberId:old.id});}
    if(!/^\/rooms\/[A-Z0-9]{6}\/join$/.test(path))return json({error:'찾을 수 없습니다.'},404);
    if(r.members.length>=ROOM_CAPACITY)throw Error('참가 인원이 가득 찼습니다.');
-   const secret=token(),id=crypto.randomUUID();r.members.push({id,name:nameOf(data),team:null,spectator:true,joinedAt:Date.now(),tokenHash:sha(secret)});commit(r);await this.save();return json({code:r.code,token:secret,memberId:id},201);
+   const secret=token(),id=crypto.randomUUID();r.members.push({id,name:nameOf(data),team:null,spectator:true,joinedAt:Date.now(),tokenHash:sha(secret),deviceIdHash:deviceHash(data)});commit(r);await this.save();return json({code:r.code,token:secret,memberId:id},201);
   }catch(error){return json({error:error.message},400);}
  });}
  async webSocketMessage(ws,raw){return this.ctx.blockConcurrencyWhile(async()=>{
@@ -124,6 +127,7 @@ export class DraftRoom extends DurableObject {
    const a=ws.deserializeAttachment()||{},now=Date.now();if(now-(a.windowAt||0)>1000){a.windowAt=now;a.messages=0;}a.messages=(a.messages||0)+1;ws.serializeAttachment(a);if(a.messages>30)throw Error('요청이 너무 빠릅니다.');
    const msg=JSON.parse(raw);requestId=msg.requestId;const r=this.room;if(!r)throw Error('방을 찾을 수 없습니다.');
    if(!a.memberId){
+    if(banned(r,msg)){ws.send(JSON.stringify({type:'kicked',message:'이 방에서 추방되어 다시 입장할 수 없습니다. 오프라인으로 전환합니다.'}));ws.close(4003,'kicked');return;}
     const m=msg.type==='auth'&&msg.code===r.code&&member(r,msg.token);if(!m){ws.send(JSON.stringify({type:'error',message:'재접속 정보가 유효하지 않습니다.'}));ws.close(1008,'invalid auth');return;}
     const previous=r.sockets.get(m.id);a.memberId=m.id;ws.serializeAttachment(a);r.sockets.set(m.id,ws);delete m.disconnectedAt;
     if(previous&&previous!==ws)previous.close(4001,'다른 탭에서 접속했습니다.');
