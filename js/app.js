@@ -102,11 +102,12 @@ function renderResults(){
  screen.hidden=!(complete&&resultsConfirmed);document.body.classList.toggle('show-results',complete&&resultsConfirmed);
  if(!complete||!resultsConfirmed)return;
  screen.classList.toggle('vertical-view',resultView==='vertical');
- screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>선발이 완료되었습니다. 돌격 카드를 드래그하거나 클릭해 다른 팀의 탱커와 교환할 수 있습니다.</p></div><div class="results-actions"><button class="secondary" id="save-result-draft">임시저장</button><button class="secondary" id="load-result-draft">불러오기</button><div class="view-switch" aria-label="팀 구성 보기"><button class="secondary" data-view="horizontal" aria-pressed="${resultView==='horizontal'}">가로 보기</button><button class="secondary" data-view="vertical" aria-pressed="${resultView==='vertical'}">세로 보기</button></div><button class="primary" id="save-results">결과 이미지 저장</button><button class="secondary" id="save-snake-results">드래프트 순서 이미지 저장</button><button class="secondary" id="edit-draft">수정하기</button><button class="primary" id="restart-draft">드래프트 다시하기</button></div></div><div class="results-grid">${order.map((team,i)=>{
+ screen.innerHTML=`<div class="results-header"><div><small>RUNNER LEAGUE / DRAFT COMPLETE</small><h1>최종 팀 구성</h1><p>${resultView==='order'?'저장 이미지와 동일한 팀별·라운드별 선발 순서입니다.':'선발이 완료되었습니다. 돌격 카드를 드래그하거나 클릭해 다른 팀의 탱커와 교환할 수 있습니다.'}</p></div><div class="results-actions"><button class="secondary" id="save-result-draft">임시저장</button><button class="secondary" id="load-result-draft">불러오기</button><div class="view-switch" aria-label="팀 구성 보기"><button class="secondary" data-view="horizontal" aria-pressed="${resultView==='horizontal'}">가로 보기</button><button class="secondary" data-view="vertical" aria-pressed="${resultView==='vertical'}">세로 보기</button><button class="secondary" data-view="order" aria-pressed="${resultView==='order'}">드래프트 순서 보기</button></div><button class="primary" id="save-results">결과 이미지 저장</button><button class="secondary" id="save-snake-results">드래프트 순서 이미지 저장</button><button class="secondary" id="edit-draft">수정하기</button><button class="primary" id="restart-draft">드래프트 다시하기</button></div></div><div class="snake-image-view" ${resultView==='order'?'':'hidden'}><img id="snake-result-image" alt="팀별·라운드별 드래프트 선발 순서"><p id="snake-image-status" role="status">순서 이미지 준비 중…</p></div><div class="results-grid" ${resultView==='order'?'hidden':''}>${order.map((team,i)=>{
  const roster=chosen().filter(p=>p.team===team).map(p=>byId(p.player));
 
  return `<article class="result-team" style="--team-color:${colors[i]}" aria-label="${tanks[team]} 팀"><div class="result-team-title"><small>TEAM ${String(i+1).padStart(2,'0')}</small><h2>${tanks[team]} 팀</h2></div><div class="result-roster">${(coachMode?['tank','damage','support','coach']:['tank','damage','support']).map(role=>{const list=role==='tank'?[byId(tanks[team])]:sortRoster(roster.filter(p=>p.role===role));return `<div class="result-role"><span>${roles[role]}</span><div>${list.map(p=>role==='tank'?`<div class="result-member"><button class="result-portrait result-tank" draggable="true" data-edit-tank="${team}" aria-label="${p.name} 탱커 교체" title="탱커 교체">${avatar(p)}</button><span class="result-member-meta"><strong>${p.name}</strong><small>${roles[p.role]}</small></span></div>`:`<div class="result-member"><div class="result-portrait">${avatar(p)}</div><span class="result-member-meta"><strong>${p.name}</strong><small>${roles[p.role]}</small></span></div>`).join('')}</div></div>`}).join('')}</div></article>`
  }).join('')}</div>`;
+ if(resultView==='order')showSnakeImage();
  document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{resultView=b.dataset.view;renderResults();bindRemovals();onlinePermissions()});
  document.querySelectorAll('[data-edit-tank]').forEach(b=>{
  b.onclick=()=>openTankPicker(b.dataset.editTank);
@@ -115,13 +116,12 @@ function renderResults(){
  b.ondrop=e=>{e.preventDefault();const source=e.dataTransfer.getData('application/x-result-tank'),target=b.dataset.editTank;if(source===target||!order.includes(source))return;if(online.action('tankSwap',{from:source,to:target}))return;[tanks[source],tanks[target]]=[tanks[target],tanks[source]];render()};
  });
  $('#save-result-draft').onclick=saveDraft;$('#load-result-draft').onclick=openSavedDrafts;
- $('#save-results').onclick=downloadResultsImage;$('#save-snake-results').onclick=downloadSnakeImage;
+ $('#save-results').onclick=resultView==='order'?downloadSnakeImage:downloadResultsImage;$('#save-snake-results').onclick=downloadSnakeImage;
  $('#edit-draft').onclick=()=>{if(online.action('edit'))return;resultsConfirmed=false;completionPrompted=true;render();window.scrollTo(0,0)};
  $('#restart-draft').onclick=()=>{reset(true);window.scrollTo(0,0)};
 }
-async function downloadSnakeImage(){
- const button=$('#save-snake-results');if(button.disabled)return;button.disabled=true;button.textContent='저장 중…';
- try{
+// Screen preview and PNG download share the original snake image renderer.
+async function renderSnakeImage(){
   await document.fonts.ready;
   const canvas=document.createElement('canvas');canvas.width=1600;canvas.height=960;
   const ctx=canvas.getContext('2d');ctx.fillStyle='#f3f6fb';ctx.fillRect(0,0,1600,960);
@@ -142,6 +142,23 @@ async function downloadSnakeImage(){
    }
   }
   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('PNG 생성 실패');
+  return blob;
+}
+let snakePreviewUrl=null;
+async function showSnakeImage(){
+ const image=$('#snake-result-image'),status=$('#snake-image-status');
+ try{
+  const blob=await renderSnakeImage();
+  // A room update or view switch may replace this image while rendering.
+  if(!image.isConnected)return;
+  if(snakePreviewUrl)URL.revokeObjectURL(snakePreviewUrl);
+  snakePreviewUrl=URL.createObjectURL(blob);image.src=snakePreviewUrl;status.hidden=true;
+ }catch(error){if(status.isConnected)status.textContent='이미지를 불러오지 못했습니다. 순서 보기를 다시 눌러주세요.';console.error(error)}
+}
+async function downloadSnakeImage(){
+ const button=$('#save-snake-results');if(button.disabled)return;button.disabled=true;button.textContent='저장 중…';
+ try{
+  const blob=await renderSnakeImage();
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='runnerleague_snake_draft.png';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
  }catch(error){toast('드래프트 순서 이미지 저장에 실패했습니다.');console.error(error)}finally{button.disabled=false;button.textContent='드래프트 순서 이미지 저장'}
 }
@@ -213,7 +230,7 @@ function saveDraft(){
 }
 function loadDraft(id){if(online.active()){toast('온라인 방에서는 로컬 저장을 불러올 수 없습니다. 혼자 하기에서 불러오세요.');return}
  try{const saved=readSavedDrafts().find(entry=>entry.id===id);if(!saved||!validSnapshot(saved.state))throw Error('유효하지 않은 저장');const state=withoutCoaches(saved.state);
- order=[...state.order];picks=state.picks.map(p=>p?{...p}:null);turnOwners=[...state.turnOwners];coachMode=state.coachMode;coaches={};tanks={...state.tanks};filter=['all','damage','support','coach'].includes(state.filter)?state.filter:'all';started=chosen().length>0||!!state.started;resultsConfirmed=!!state.resultsConfirmed;resultView=state.resultView==='vertical'?'vertical':'horizontal';completionPrompted=false;$('#saved-drafts').close();render();toast('임시저장한 드래프트를 불러왔습니다.');
+ order=[...state.order];picks=state.picks.map(p=>p?{...p}:null);turnOwners=[...state.turnOwners];coachMode=state.coachMode;coaches={};tanks={...state.tanks};filter=['all','damage','support','coach'].includes(state.filter)?state.filter:'all';started=chosen().length>0||!!state.started;resultsConfirmed=!!state.resultsConfirmed;resultView=['vertical','order'].includes(state.resultView)?state.resultView:'horizontal';completionPrompted=false;$('#saved-drafts').close();render();toast('임시저장한 드래프트를 불러왔습니다.');
  }catch(error){toast('저장 내용을 불러올 수 없습니다.');console.error(error)}
 }
 function openSavedDrafts(){
