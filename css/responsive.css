@@ -1,0 +1,58 @@
+/* Readable mobile cards and one-screen desktop workspace. Export sizes stay fixed. */
+#mobile-result-grid{display:none}
+@media(min-width:900px){
+ header{height:auto;min-height:60px;margin-bottom:10px;padding:10px 16px;gap:12px}
+ main{display:grid!important;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);grid-template-areas:'setup board' 'pool board';grid-template-rows:clamp(116px,17dvh,150px) minmax(0,1fr);height:calc(100dvh - var(--draft-top,72px))!important;min-height:0;width:100%;max-width:none;gap:10px;padding:0 12px 10px}
+ .team-section,.mobile-draft-overview{display:none!important}
+ .setup{height:auto;min-height:0;display:flex;justify-content:flex-start;gap:5px;padding:10px}
+ .setup .captains{flex:1;min-height:0}.setup .captain{height:100%;min-height:0}.setup .captain .avatar{height:100%;max-height:90px;width:100%;max-width:none}.setup-bottom{display:none}
+ .pool-panel,.board-panel{height:auto;min-height:0;padding:10px}
+ .board-scroll{flex:1;min-height:0}.board-panel{overflow:hidden}.board-note{display:none}
+ .board-panel>.section-heading{margin-bottom:6px}.online-room-toolbar{gap:6px}
+ .turn-banner{min-height:46px;padding:7px 10px;margin-bottom:6px}
+ .progress{margin-bottom:8px}
+ #board{gap:6px;min-height:0;grid-template-rows:repeat(5,minmax(0,1fr))}
+ .draft-team-row{padding:5px;gap:6px;min-height:0}
+ .draft-cell .avatar,.board-captain .avatar{height:100%;max-height:clamp(52px,10dvh,108px);width:100%;max-width:none;object-fit:contain}
+ .draft-cell .selected-player{height:100%;min-height:0}.draft-cell{overflow:hidden}.pick-number{flex-shrink:0}
+ #pool{min-height:0;grid-template-rows:18px minmax(0,1fr) 18px minmax(0,1fr)!important}
+ #pool:has(>.player-grid:last-child:nth-child(2)){grid-template-rows:18px minmax(0,1fr)!important}
+ #pool .player-grid{grid-template-rows:repeat(2,minmax(0,1fr));gap:5px}#pool .player{height:100%;min-height:0}#pool .avatar{height:100%;max-height:none;width:100%;object-fit:contain}
+}
+@media(max-width:899px){
+ header{margin-bottom:8px;gap:6px;padding:8px 10px;min-height:0}.brand{font-size:13px}.brandmark{width:28px;height:28px}
+ .header-right{gap:6px!important}.connection-tools,.draft-save-tools{gap:5px}.connection-tools button,.draft-save-tools .secondary{min-height:36px!important;padding:6px 8px!important;font-size:11px!important}
+ main{display:flex!important;height:auto!important;min-height:0;padding:0 8px 14px;gap:8px}
+ .setup{padding:8px;gap:5px;min-height:0}.setup .captains{gap:4px}.setup .captain .avatar{height:60px}.setup .section-heading{margin:0}.setup #order-help{font-size:9px}.setup-bottom{display:none}
+ .draft-started .setup{display:none}
+ .mobile-draft-overview{display:block;position:sticky;top:0;z-index:5;padding:9px;border-radius:12px;background:#fff;box-shadow:0 3px 12px #17243b12;order:1}
+ .mobile-overview-heading{margin:0;font-size:14px}.mobile-overview-heading strong{color:#2463eb}.mobile-overview-heading span{font-size:12px}.mobile-next{font-size:11px;color:#758399;margin:3px 0 5px}
+ .mobile-team-tabs{margin:5px 0;gap:4px}.mobile-team-tabs .secondary{min-height:34px;font-size:12px}
+ .mobile-roster{gap:4px}.mobile-roster .avatar,.mobile-empty{height:78px;max-height:78px;width:100%;object-fit:contain}
+ .mobile-roster small{font-size:10px}.mobile-overview-tools{display:flex;gap:5px;margin-top:7px}.mobile-overview-tools button{flex:1;min-height:32px;padding:5px;font-size:11px}
+ body:not(.draft-started) .mobile-roster,body:not(.draft-started) .mobile-team-tabs{display:none}
+ .board-panel{display:none;order:3;scroll-margin-top:230px;min-height:0;height:auto}.show-mobile-board .board-panel{display:flex}
+ .pool-panel{order:2;min-height:0;padding:10px}.pool-panel .section-heading{margin-bottom:5px}.tabs{margin-bottom:4px}.tabs button{min-height:34px}.player-grid{gap:6px 4px}.player .avatar{height:clamp(72px,22vw,96px)!important}
+ #pool .role-heading{margin:8px 0 5px!important}.team-section{display:none}
+ #results{padding:12px 10px;gap:9px;overflow:auto}
+ #results .results-header{flex-shrink:0;margin:0;gap:8px}#results .results-heading>small{font-size:9px}
+ #results .results-actions{gap:5px}#results .results-actions button{min-height:36px;padding:6px 8px;font-size:11px}
+ #results .results-image-view{display:none}
+ #mobile-result-grid{display:grid;gap:8px;width:100%}
+ .mobile-result-team{background:white;border:1px solid #dce5f2;border-left:3px solid var(--team-color);border-radius:12px;padding:8px 9px}
+ .mobile-result-team h2{margin:0 0 5px;font-size:14px}.mobile-result-members{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+ .mobile-result-members>div{display:flex;flex-direction:column;align-items:center;min-width:0;gap:3px}.mobile-result-members small{font-size:10px;color:#758399}
+ .mobile-result-members .avatar{width:100%;height:clamp(76px,22vw,106px);object-fit:contain;max-width:none;border:0;background:none}
+ #results.vertical-view #mobile-result-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #results.vertical-view .mobile-result-members{grid-template-columns:repeat(2,minmax(0,1fr))}#results.vertical-view .mobile-result-members>div:first-child{grid-column:1/-1}#results.vertical-view .mobile-result-members .avatar{height:80px}
+}
+@media(min-width:900px){#pool{display:grid!important}.setup .captain .avatar{height:calc(100% - 16px);min-height:0}.pool-panel{overflow:hidden}}
+@media(max-width:499px){.mobile-result-members .avatar{height:76px}}
+@media(min-width:900px){main{align-items:stretch!important}.pool-panel,.board-panel,.setup{height:100%;min-height:0}.pool-panel{max-height:100%}.setup .captains{height:calc(100% - 26px)}}
+#results-more{display:none}#results-extra{display:contents}
+@media(max-width:899px){
+ #results .results-actions{position:relative;width:auto;justify-content:flex-end;margin-left:auto;flex-wrap:nowrap}
+ #results-more{display:inline-flex}
+ #results-extra{display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:3;min-width:190px;padding:8px;background:#fff;border:1px solid #dce5f2;border-radius:10px;box-shadow:0 6px 24px #17243b20}
+ .extras-open #results-extra{display:flex;flex-direction:column;gap:6px}#results #results-extra button{width:100%;min-height:40px}
+}
