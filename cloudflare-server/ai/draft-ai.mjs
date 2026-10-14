@@ -1,4 +1,4 @@
-import {players,eligible,teamAt} from './model.mjs';
+import {players,eligible,teamAt} from '../../shared/model.mjs';
 import {WOLF_PROFILES,adjustment} from './draft-evidence.mjs';
 export {EVIDENCE_AS_OF} from './draft-evidence.mjs';
 export const POLICY_VERSION='runnerleague-community-v8';

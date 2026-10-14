@@ -1,0 +1,17 @@
+{
+  "testsPassed": 18,
+  "testsFailed": 0,
+  "captainOrderPermutations": 120,
+  "browserWidths": [
+    360,
+    390,
+    768,
+    980,
+    1440
+  ],
+  "browserErrors": [],
+  "wranglerDryRun": true,
+  "serverUrlUnchanged": true,
+  "cloudflareRootDirectory": "cloudflare-server",
+  "published": false
+}

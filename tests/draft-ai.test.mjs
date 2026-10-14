@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {chooseDraftPlayer,draftProfile,evaluateDraftTeam,rankDraftCandidates,POLICY_VERSION} from './draft-ai.mjs';
-import {evidenceWeight,weightedAdjustment,signals,WOLF_PROFILES} from './draft-evidence.mjs';
-import {players,initialOrder,eligible,teamAt} from './model.mjs';
+import {chooseDraftPlayer,draftProfile,evaluateDraftTeam,rankDraftCandidates,POLICY_VERSION} from '../cloudflare-server/ai/draft-ai.mjs';
+import {evidenceWeight,weightedAdjustment,signals,WOLF_PROFILES} from '../cloudflare-server/ai/draft-evidence.mjs';
+import {players,initialOrder,eligible,teamAt} from '../shared/model.mjs';
 
 test('Latest captain context changes the draft without treating preferences as skill ranks',()=>{
  assert.equal(POLICY_VERSION,'runnerleague-community-v8');

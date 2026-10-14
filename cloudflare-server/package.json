@@ -9,7 +9,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "check": "wrangler deploy --dry-run",
-    "test": "node --test --test-concurrency=1 test.mjs"
+    "test": "node --test --test-concurrency=1 ../tests/structure.test.mjs ../tests/rooms.test.mjs ../tests/draft-ai.test.mjs"
   },
   "devDependencies": {
     "esbuild": "0.28.2",
