@@ -56,3 +56,33 @@
  #results-extra{display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:3;min-width:190px;padding:8px;background:#fff;border:1px solid #dce5f2;border-radius:10px;box-shadow:0 6px 24px #17243b20}
  .extras-open #results-extra{display:flex;flex-direction:column;gap:6px}#results #results-extra button{width:100%;min-height:40px}
 }
+
+/* Fit all five teams into the actual visible area without stretching portraits. */
+@media(max-width:899px){
+ #results{inset:auto 0;top:var(--visible-top,0px);height:var(--visible-height,100dvh);max-height:100dvh;padding-bottom:calc(10px + env(safe-area-inset-bottom));overflow:hidden}
+ #mobile-result-grid{height:var(--mobile-grid-height,calc(100dvh - 130px));min-height:0;grid-template-rows:repeat(5,minmax(0,1fr));gap:6px;flex:none}
+ .mobile-result-team{min-height:0;display:flex;flex-direction:column;padding:5px 7px;border-radius:9px}
+ .mobile-result-team h2{flex:none;margin:0 0 3px;font-size:13px;line-height:17px}
+ .mobile-result-members{flex:1;min-height:0;gap:4px;grid-template-rows:minmax(0,1fr)}
+ .mobile-result-members>div{min-height:0;gap:2px}.mobile-result-members small{flex:none;font-size:9px;line-height:12px}
+ #results .mobile-result-members .avatar{flex:1;height:0;min-height:0;max-height:none;object-fit:contain;width:100%}
+ #results.vertical-view #mobile-result-grid{grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:minmax(0,1fr);gap:4px}
+ #results.vertical-view .mobile-result-team{padding:5px 3px;border-left:0;border-top:3px solid var(--team-color)}
+ #results.vertical-view .mobile-result-team h2{font-size:11px;text-align:center;white-space:normal;line-height:15px;min-height:30px}
+ #results.vertical-view .mobile-result-members{grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(5,minmax(0,1fr));gap:5px}
+ #results.vertical-view .mobile-result-members>div:first-child{grid-column:auto}
+ #mobile-teams-dialog{height:calc(var(--visible-height,100dvh) - 24px);max-height:calc(var(--visible-height,100dvh) - 24px);padding:12px;overflow:hidden}
+ #mobile-teams-dialog[open]{display:flex;flex-direction:column;gap:7px}
+ #mobile-teams-dialog h2{flex:none;font-size:18px;margin:0}
+ #mobile-teams-dialog .mobile-all-rosters{flex:1;min-height:0;margin:0;grid-template-rows:repeat(5,minmax(0,1fr));gap:5px}
+ #mobile-teams-dialog .team{height:100%;min-height:0;padding:5px 7px;gap:3px}
+ #mobile-teams-dialog .team-top{min-height:16px;flex:none}.mobile-all-rosters .team-top h3{font-size:12px}
+ #mobile-teams-dialog .slots{min-height:0;grid-template-rows:minmax(0,1fr)}
+ #mobile-teams-dialog .slot{min-height:0;height:100%;gap:2px}
+ #mobile-teams-dialog .slot-label{font-size:9px;line-height:12px;flex:none}
+ #mobile-teams-dialog .selected-player{flex:1;height:0;min-height:0}
+ #mobile-teams-dialog .slot>.avatar{flex:1;height:0;min-height:0}
+ #mobile-teams-dialog .slot .avatar{height:100%;width:100%;min-height:0;max-width:none;object-fit:contain}
+ #mobile-teams-dialog .slot>strong{display:none}
+ #mobile-teams-dialog #close-mobile-teams{flex:none;min-height:34px;padding:6px}
+}

@@ -1,5 +1,5 @@
-import {ONLINE_SERVER_URL} from './online-config.js?v=responsive-v16';
-import {initialOrder,players,ROOM_CAPACITY} from '../shared/model.mjs?v=responsive-v16';
+import {ONLINE_SERVER_URL} from './online-config.js?v=mobile-fix-v17';
+import {initialOrder,players,ROOM_CAPACITY} from '../shared/model.mjs?v=mobile-fix-v17';
 
 // 연결/권한 상태는 이 모듈에서 관리하고, 선수 화면은 app.js에 맡깁니다.
 const $ = selector => document.querySelector(selector);
