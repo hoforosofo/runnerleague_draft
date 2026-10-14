@@ -18,12 +18,13 @@ function persist(){if(!storage)return;const data=[...rooms.values()].map(({socke
 const sha=value=>crypto.createHash('sha256').update(value).digest('hex');
 const token=()=>crypto.randomBytes(32).toString('base64url');
 function assignRandom(r,m){const vacant=r.state.order.filter(t=>!r.members.some(p=>p.team===t));m.team=vacant.length?vacant[crypto.randomInt(vacant.length)]:null;m.spectator=!m.team;}
-function initial(){return {order:[...initialOrder],picks:[],turnOwners:Array.from({length:20},(_,i)=>initialOrder[Math.floor(i/5)%2?4-i%5:i%5]),coachMode:false,autoPick:true,coaches:{},tanks:Object.fromEntries(initialOrder.map(t=>[t,t])),started:false,resultsConfirmed:false}}
+function parseTurnLimit(seconds){if(!Number.isInteger(seconds)||seconds<0||seconds>3600)throw Error('선발 시간은 1~3600초 또는 무제한으로 설정하세요.');return seconds*1000}
+function initial(){return {turnLimitMs:turnLimit,order:[...initialOrder],picks:[],turnOwners:Array.from({length:20},(_,i)=>initialOrder[Math.floor(i/5)%2?4-i%5:i%5]),coachMode:false,autoPick:true,coaches:{},tanks:Object.fromEntries(initialOrder.map(t=>[t,t])),started:false,resultsConfirmed:false}}
 const selected=r=>r.state.picks.filter(Boolean);
 function count(){return 20}
 function nextIndex(r){for(let i=0;i<count(r);i++)if(!r.state.picks[i])return i;return -1}
 function schedule(r){const s=r.state,remaining=Object.fromEntries(s.order.map(t=>[t,count(r)/5-selected(r).filter(p=>p.team===t).length]));const queue=[];for(let round=0;queue.length<count(r)-selected(r).length;round++)for(const t of round%2?[...s.order].reverse():s.order)if(remaining[t]>0){queue.push(t);remaining[t]--}s.turnOwners=Array.from({length:count(r)},(_,i)=>s.picks[i]?.team||queue.shift())}
-function syncTurn(r){const s=r.state,index=nextIndex(r),team=s.turnOwners[index];if(!s.started||s.resultsConfirmed||index<0){s.turnTimer=null;return}if(!s.turnTimer||s.turnTimer.index!==index||s.turnTimer.team!==team)s.turnTimer={index,team,deadline:Date.now()+turnLimit}}
+function syncTurn(r){const s=r.state,index=nextIndex(r),team=s.turnOwners[index];if(!s.started||s.resultsConfirmed||index<0){s.turnTimer=null;return}if(!s.turnTimer||s.turnTimer.index!==index||s.turnTimer.team!==team)s.turnTimer={index,team,deadline:(s.turnLimitMs??turnLimit)===0?null:Date.now()+(s.turnLimitMs??turnLimit)}}
 for(const r of rooms.values()){
  if(r.state.coachMode){r.state.picks=r.state.picks.filter(p=>p&&byId(p.player)?.role!=='coach');r.state.coachMode=false;r.state.coaches={};}
  if(r.state.order.some((t,i)=>t!==initialOrder[i])||r.state.turnOwners.length!==20){r.state.order=[...initialOrder];schedule(r);r.state.turnTimer=null;}
@@ -68,6 +69,8 @@ function command(r,m,action,data={}){
  }else if(action==='start'){
   requireHost(r,m);if(s.started)throw Error('이미 시작했습니다.');if(!s.autoPick&&initialOrder.some(t=>!r.members.some(p=>p.team===t)))throw Error('5개 팀의 팀장이 모두 선택되어야 합니다.');
   if(!s.autoPick&&r.members.some(p=>p.team&&!r.sockets.has(p.id)))throw Error('팀장이 모두 접속한 뒤 시작하세요.');s.started=true;
+ }else if(action==='turnLimit'){
+  requireHost(r,m);if(s.started)throw Error('드래프트 시작 전에 시간을 설정하세요.');s.turnLimitMs=parseTurnLimit(data.seconds);s.turnTimer=null;
  }else if(action==='order'){
   throw Error('드래프트 순서는 고정되어 있습니다.');
  }else if(action==='matchVote'||action==='matchPosition'){
@@ -94,7 +97,7 @@ function command(r,m,action,data={}){
  }else if(action==='tankSwap'){
   requireHost(r,m);if(!s.resultsConfirmed||!s.order.includes(data.from)||!s.order.includes(data.to))throw Error('최종 화면에서만 교환할 수 있습니다.');[s.tanks[data.from],s.tanks[data.to]]=[s.tanks[data.to],s.tanks[data.from]];
  }else if(action==='reset'){
-  requireHost(r,m);const randomMatching=s.randomMatching===true;r.state=initial();r.state.randomMatching=randomMatching;
+  requireHost(r,m);const randomMatching=s.randomMatching===true,limit=s.turnLimitMs??turnLimit;r.state=initial();r.state.randomMatching=randomMatching;r.state.turnLimitMs=limit;
  }else if(action==='release'){
   requireHost(r,m);if(s.started)throw Error('시작 후 팀장을 변경할 수 없습니다.');const target=r.members.find(p=>p.id===data.memberId);if(target){target.team=null;target.spectator=true}
  }else throw Error('지원하지 않는 요청입니다.');
@@ -115,7 +118,7 @@ const server=http.createServer(async(req,res)=>{
   const secret=token(),id=crypto.randomUUID();r.members.push({id,name,team:null,spectator:false,joinedAt:Date.now(),tokenHash:sha(secret)});r.hostId||=id;commit(r);return sendJSON(res,201,{code:r.code,token:secret,memberId:id});
  }
  if(req.url==='/rooms'){
-  if(rooms.size>=1000)throw Error('현재 방이 너무 많습니다.');let code;do{code=crypto.randomBytes(4).toString('hex').slice(0,6).toUpperCase()}while(rooms.has(code));const secret=token(),id=crypto.randomUUID(),r={code,name:String(data.roomName||'러너리그 드래프트').slice(0,50),hostId:id,revision:0,updatedAt:Date.now(),members:[{id,name,team:null,spectator:false,tokenHash:sha(secret)}],state:initial(),sockets:new Map()};if(data.order!==undefined){if(!Array.isArray(data.order)||data.order.length!==5||new Set(data.order).size!==5||!data.order.every(t=>initialOrder.includes(t)))throw Error('드래프트 순서를 확인하세요.');r.state.order=[...initialOrder];schedule(r)}r.state.autoPick=data.autoPick!==false;r.state.randomMatching=data.randomMatching===true;if(r.state.randomMatching)assignRandom(r,r.members[0]);rooms.set(code,r);persist();return sendJSON(res,201,{code,token:secret,memberId:id});
+  if(rooms.size>=1000)throw Error('현재 방이 너무 많습니다.');let code;do{code=crypto.randomBytes(4).toString('hex').slice(0,6).toUpperCase()}while(rooms.has(code));const secret=token(),id=crypto.randomUUID(),r={code,name:String(data.roomName||'러너리그 드래프트').slice(0,50),hostId:id,revision:0,updatedAt:Date.now(),members:[{id,name,team:null,spectator:false,tokenHash:sha(secret)}],state:initial(),sockets:new Map()};if(data.order!==undefined){if(!Array.isArray(data.order)||data.order.length!==5||new Set(data.order).size!==5||!data.order.every(t=>initialOrder.includes(t)))throw Error('드래프트 순서를 확인하세요.');r.state.order=[...initialOrder];schedule(r)}if(data.turnLimitSeconds!==undefined)r.state.turnLimitMs=parseTurnLimit(data.turnLimitSeconds);r.state.autoPick=data.autoPick!==false;r.state.randomMatching=data.randomMatching===true;if(r.state.randomMatching)assignRandom(r,r.members[0]);rooms.set(code,r);persist();return sendJSON(res,201,{code,token:secret,memberId:id});
  }
  const leaving=req.url.match(/^\/rooms\/([A-Z0-9]{6})\/leave$/);if(leaving){const r=rooms.get(leaving[1]);const m=r&&member(r,data.token);if(m)leaveRoom(r,m);return sendJSON(res,200,{ok:true});}
  const match=req.url.match(/^\/rooms\/([A-Z0-9]{6})\/join$/);if(!match)return sendJSON(res,404,{error:'찾을 수 없습니다.'});const r=rooms.get(match[1]);if(!r)throw Error('방을 찾을 수 없습니다.');
@@ -133,7 +136,7 @@ setInterval(()=>{for(const r of rooms.values())for(let step=0;step<25;step++){
  syncTurn(r);
  const index=nextIndex(r),team=r.state.turnOwners[index],owner=r.members.find(m=>m.team===team);
  if(index<0){botWaits.delete(r.code);break}
- const expired=Date.now()>=r.state.turnTimer.deadline;
+ const expired=typeof r.state.turnTimer?.deadline==='number'&&Date.now()>=r.state.turnTimer.deadline;
  if(!expired&&(owner&&r.sockets.has(owner.id)||!r.state.autoPick)){botWaits.delete(r.code);break}
  let wait=botWaits.get(r.code);if(!wait||wait.index!==index){wait={index,until:Date.now()+(owner?reconnectGrace:vacantDelay)};botWaits.set(r.code,wait)}
  if(!expired&&Date.now()<wait.until)break;const decision=chooseDraftPlayer(r.state,team);if(decision){r.state.picks[index]={player:decision.player.id,team,automatic:true,autoPolicy:decision.policyVersion};commit(r)}else break;

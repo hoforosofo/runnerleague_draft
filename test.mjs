@@ -29,6 +29,36 @@ async function post(url,data){const response=await fetch(base+url,{method:'POST'
 async function client(credentials){const ws=new WebSocket(`ws://127.0.0.1:${port}/ws`,{origin});let room;await new Promise((resolve,reject)=>{ws.once('open',()=>ws.send(JSON.stringify({type:'auth',code:credentials.code,token:credentials.token})));ws.once('error',reject);ws.on('message',raw=>{const msg=JSON.parse(raw);if(msg.type==='state'){room=msg.room;resolve()}})});return {ws,get room(){return room},async cmd(action,data={}){await new Promise(resolve=>setTimeout(resolve,10));const revision=room.revision,requestId=crypto.randomUUID();return new Promise((resolve,reject)=>{const timeout=setTimeout(()=>{ws.off('message',listener);reject(Error('response timeout'))},3000);function listener(raw){const msg=JSON.parse(raw);if(msg.requestId===requestId&&(msg.type==='error'||msg.type==='ack')){clearTimeout(timeout);ws.off('message',listener);resolve(msg)}}ws.on('message',listener);ws.send(JSON.stringify({type:'command',action,data,revision,requestId}))})}}}
 const good=msg=>assert.equal(msg.type,'ack',JSON.stringify(msg));
 const denied=msg=>assert.equal(msg.type,'error',JSON.stringify(msg));
+test('Custom seconds, unlimited, host authority and reset retention',async()=>{
+ const clients=[];
+ try{
+  await start();
+  for(const seconds of [-1,1.5,null,'30',3601]){
+   const response=await fetch(base+'/rooms',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({turnLimitSeconds:seconds})});
+   assert.equal(response.status,400);
+  }
+  async function ready(seconds){
+   const token=await post('/rooms',{turnLimitSeconds:seconds,autoPick:false}),host=await client(token);clients.push(host);
+   good(await host.cmd('claim',{team:initialOrder[0]}));
+   for(let i=1;i<5;i++){const token=await post('/rooms/'+host.room.code+'/join',{}),peer=await client(token);clients.push(peer);good(await peer.cmd('claim',{team:initialOrder[i]}))}
+   return host;
+  }
+  const timed=await ready(1);assert.equal(timed.room.state.turnLimitMs,1000);
+  denied(await clients.at(-1).cmd('turnLimit',{seconds:10}));
+  good(await timed.cmd('turnLimit',{seconds:2}));assert.equal(timed.room.state.turnLimitMs,2000);
+  good(await timed.cmd('turnLimit',{seconds:1}));good(await timed.cmd('start'));
+  const left=timed.room.state.turnTimer.deadline-Date.now();assert.ok(left>500&&left<=1000);
+  denied(await timed.cmd('turnLimit',{seconds:0}));
+  await until(()=>timed.room.state.picks.filter(Boolean).length>=1);
+  assert.ok(timed.room.state.picks[0].automatic);
+  const unlimited=await ready(0);assert.equal(unlimited.room.state.turnLimitMs,0);
+  good(await unlimited.cmd('start'));assert.equal(unlimited.room.state.turnTimer.deadline,null);
+  await delay(1500);assert.equal(unlimited.room.state.picks.filter(Boolean).length,0);
+  good(await unlimited.cmd('pick',{player:'김뿡'}));assert.equal(unlimited.room.state.turnTimer.deadline,null);
+  good(await unlimited.cmd('reset'));assert.equal(unlimited.room.state.turnLimitMs,0);
+  good(await unlimited.cmd('start'));assert.equal(unlimited.room.state.turnTimer.deadline,null);
+ }finally{for(const c of clients)c.ws.terminate();await stop();rmSync(dir,{recursive:true,force:true})}
+});
 test('Online authority, sequential claims, complete draft and server restart',async()=>{
  const clients=[];
  try{await start();const owner=await post('/rooms',{name:'방장',autoPick:false}),host=await client(owner);clients.push(host);good(await host.cmd('spectate'));const credentials=[];
